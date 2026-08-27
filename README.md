@@ -90,6 +90,21 @@ Accounts you already approved before this flow existed keep working exactly
 as before — this only adds a queue for *new* sign-ups, it doesn't require
 existing users to verify their email.
 
+### Making yourself an admin (in-app approval panel)
+
+Instead of doing step 3 above by hand in the console every time, an admin
+can approve/reject requests and manage the allowlist right inside the app
+via the 🛡️ button in the header (only visible to admins). To make an
+account an admin:
+
+1. In Firestore Database, click **Start collection**.
+2. Collection ID: `admins`
+3. Document ID: that person's email, all lowercase (same format as
+   `allowlist`). Any single field works, e.g. `admin: true`.
+4. Repeat for each admin. There's no in-app way to promote/demote admins —
+   that's deliberately Console-only, so a compromised account can't grant
+   itself or others more access.
+
 ## 6. Deploy the security rules
 
 Install the Firebase CLI once (needs [Node.js](https://nodejs.org/)):
