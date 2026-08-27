@@ -397,10 +397,47 @@
         <input type="password" id="authPasswordConfirm" autocomplete="new-password" placeholder="আবার পাসওয়ার্ড দিন" minlength="6">
       </div>
       <span class="auth-forgot" id="authForgotBtn">পাসওয়ার্ড ভুলে গেছেন?</span>
+      <p class="muted" id="authSignupNote" style="display:none; margin:-4px 0 12px;">সাইন আপের পর ইমেইল যাচাই করতে হবে, তারপর অ্যাডমিন অনুমোদন করলে ড্যাশবোর্ড দেখা যাবে।</p>
       <div class="modal-actions" style="margin-top:0;">
         <button type="submit" class="btn primary" id="authSubmitBtn" style="flex:1 1 100%;">লগইন করুন</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="verifyScreen" class="auth-screen" style="display:none">
+  <div class="auth-brand">
+    <div class="brick-badge" style="margin:0 auto 12px;"></div>
+    <h1>ইমেইল যাচাই করুন</h1>
+    <div class="sub">যাচাইকরণ লিংক পাঠানো হয়েছে</div>
+  </div>
+  <div class="auth-card">
+    <p class="muted"><b id="verifyEmailLabel">—</b>-এ একটি যাচাইকরণ ইমেইল পাঠানো হয়েছে। ইমেইলের লিংকে ক্লিক করে যাচাই করুন, তারপর নিচের বাটনে চাপুন।</p>
+    <div class="auth-msg" id="verifyMsg"></div>
+    <div class="modal-actions" style="margin-top:0;">
+      <button type="button" class="btn primary" id="verifyRecheckBtn" style="flex:1 1 100%;">✅ যাচাই করেছি, আবার চেক করুন</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="verifyResendBtn">✉️ আবার পাঠান</button>
+      <button type="button" class="btn ghost" id="verifyLogoutBtn">🚪 লগআউট</button>
+    </div>
+  </div>
+</div>
+
+<div id="pendingScreen" class="auth-screen" style="display:none">
+  <div class="auth-brand">
+    <div class="brick-badge" style="margin:0 auto 12px;"></div>
+    <h1>অনুমোদনের অপেক্ষায়</h1>
+    <div class="sub">ইমেইল যাচাই সম্পন্ন হয়েছে</div>
+  </div>
+  <div class="auth-card">
+    <p class="muted">আপনার আবেদন জমা হয়েছে। অ্যাডমিন অনুমোদন করলেই আপনি ড্যাশবোর্ড দেখতে পাবেন। কিছুক্ষণ পর আবার চেক করুন।</p>
+    <div class="modal-actions" style="margin-top:0;">
+      <button type="button" class="btn primary" id="pendingRecheckBtn" style="flex:1 1 100%;">🔄 আবার চেক করুন</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="pendingLogoutBtn">🚪 লগআউট</button>
+    </div>
   </div>
 </div>
 
@@ -527,9 +564,97 @@ async function checkAccessAndLoad(user){
     return true;
   }catch(e){
     console.warn('Access check failed', e);
-    currentUser = null;
     return false;
   }
+}
+
+/* ---------------- Signup approval flow: verify email -> pending -> allowlist ---------------- */
+async function ensurePendingRecord(user){
+  if(!firebaseDb) return;
+  try{
+    await firebaseDb.collection('pending').doc(user.uid).set({
+      email: user.email,
+      requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+  }catch(e){ console.warn('pending record write failed', e); }
+}
+
+// Already-allowlisted users always get straight in, regardless of emailVerified,
+// so this never breaks accounts approved before this flow existed. Only a NOT-YET
+// allowlisted user is required to verify their email before a pending request
+// is created for the admin to review.
+async function handleAuthenticatedUser(user){
+  currentUser = user;
+  const ok = await checkAccessAndLoad(user);
+  if(ok){ showApp(); return; }
+  if(!user.emailVerified){
+    showVerifyScreen(user);
+    return;
+  }
+  await ensurePendingRecord(user);
+  showPendingScreen();
+}
+
+function showVerifyScreen(user){
+  document.getElementById('verifyEmailLabel').textContent = user.email;
+  document.getElementById('verifyMsg').className = 'auth-msg';
+  showScreen('verify');
+}
+
+function showPendingScreen(){
+  showScreen('pending');
+}
+
+async function recheckVerification(){
+  if(!currentUser) return;
+  const btn = document.getElementById('verifyRecheckBtn');
+  btn.disabled = true;
+  try{
+    await currentUser.reload();
+    if(currentUser.emailVerified){
+      await handleAuthenticatedUser(currentUser);
+    } else {
+      const msg = document.getElementById('verifyMsg');
+      msg.textContent = 'এখনো যাচাই হয়নি — ইমেইলের লিংকে ক্লিক করুন, তারপর আবার চেষ্টা করুন';
+      msg.className = 'auth-msg err show';
+    }
+  } finally { btn.disabled = false; }
+}
+
+async function resendVerification(){
+  if(!currentUser) return;
+  const msg = document.getElementById('verifyMsg');
+  try{
+    await currentUser.sendEmailVerification();
+    msg.textContent = 'যাচাইকরণ ইমেইল আবার পাঠানো হয়েছে';
+    msg.className = 'auth-msg ok show';
+  }catch(e){
+    msg.textContent = 'পাঠানো ব্যর্থ: '+(e.message||'error');
+    msg.className = 'auth-msg err show';
+  }
+}
+
+async function recheckPending(){
+  if(!currentUser) return;
+  showToast('চেক করা হচ্ছে…');
+  const ok = await checkAccessAndLoad(currentUser);
+  if(ok){ showApp(); }
+  else{ showToast('এখনো অনুমোদন হয়নি'); }
+}
+
+async function screenLogout(){
+  try{
+    if(unsubscribeState){ try{ unsubscribeState(); }catch(e){} unsubscribeState=null; }
+    await firebaseAuth.signOut();
+  }catch(e){ showToast('লগআউট ব্যর্থ হয়েছে'); }
+}
+
+function wireExtraScreens(){
+  document.getElementById('verifyRecheckBtn').onclick = recheckVerification;
+  document.getElementById('verifyResendBtn').onclick = resendVerification;
+  document.getElementById('verifyLogoutBtn').onclick = screenLogout;
+  document.getElementById('pendingRecheckBtn').onclick = recheckPending;
+  document.getElementById('pendingLogoutBtn').onclick = screenLogout;
 }
 
 function attachRealtimeListener(){
@@ -702,7 +827,7 @@ let STATE = { shareholders:[], deposits:[], expenses:[], categories:[], supplier
 let CURRENT_TAB = 'dashboard';
 
 function showScreen(name){
-  const map = { boot:'bootScreen', setup:'setupScreen', auth:'authScreen', app:'app' };
+  const map = { boot:'bootScreen', setup:'setupScreen', auth:'authScreen', verify:'verifyScreen', pending:'pendingScreen', app:'app' };
   Object.entries(map).forEach(([key, id])=>{
     const el = document.getElementById(id);
     if(key === name){
@@ -720,32 +845,23 @@ function showApp(){
   renderSyncBadge();
 }
 
-function showAuthScreen(message){
+function showAuthScreen(){
   showScreen('auth');
   const el = document.getElementById('authMsg');
-  if(message){ el.textContent = message; el.className = 'auth-msg err show'; }
-  else { el.textContent=''; el.className='auth-msg'; }
+  el.textContent=''; el.className='auth-msg';
 }
-
-let pendingAuthMessage = null;
 
 function bootstrapApp(){
   wireAuthScreen();
+  wireExtraScreens();
   if(!initFirebase()){ showScreen('setup'); return; }
   firebaseAuth.onAuthStateChanged(async user=>{
     if(user){
-      const ok = await checkAccessAndLoad(user);
-      if(ok){
-        showApp();
-      } else {
-        pendingAuthMessage = 'এই ইমেইল দিয়ে অ্যাপটি ব্যবহারের অনুমতি নেই। অ্যাডমিনের সাথে যোগাযোগ করুন।';
-        try{ await firebaseAuth.signOut(); }catch(e){}
-      }
+      await handleAuthenticatedUser(user);
     } else {
       currentUser = null;
       if(unsubscribeState){ try{ unsubscribeState(); }catch(e){} unsubscribeState=null; }
-      showAuthScreen(pendingAuthMessage);
-      pendingAuthMessage = null;
+      showAuthScreen();
     }
   });
 }
@@ -761,6 +877,7 @@ function setAuthMode(mode){
   document.getElementById('authPasswordConfirm').required = mode==='signup';
   document.getElementById('authPassword').autocomplete = mode==='signup' ? 'new-password' : 'current-password';
   document.getElementById('authSubmitBtn').textContent = mode==='signup' ? 'অ্যাকাউন্ট তৈরি করুন' : 'লগইন করুন';
+  document.getElementById('authSignupNote').style.display = mode==='signup' ? '' : 'none';
   document.getElementById('authMsg').className = 'auth-msg';
 }
 
@@ -796,8 +913,12 @@ async function handleAuthSubmit(ev){
   btn.disabled = true;
   msg.className = 'auth-msg';
   try{
-    if(authMode==='signup') await firebaseAuth.createUserWithEmailAndPassword(email, password);
-    else await firebaseAuth.signInWithEmailAndPassword(email, password);
+    if(authMode==='signup'){
+      const cred = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+      try{ await cred.user.sendEmailVerification(); }catch(e){}
+    } else {
+      await firebaseAuth.signInWithEmailAndPassword(email, password);
+    }
   }catch(e){
     msg.textContent = authErrorMessage(e);
     msg.className = 'auth-msg err show';

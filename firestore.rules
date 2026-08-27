@@ -11,6 +11,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Self-service access requests. A signed-in user with a verified email can
+    // create/update ONLY their own request document (doc ID = their uid) so the
+    // admin can review it in the Firebase Console and, once approved, add their
+    // email to the allowlist collection above. Nobody can delete these from the
+    // app (cleanup is a manual admin step) and nobody can read another user's.
+    match /pending/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.email_verified == true;
+      allow delete: if false;
+    }
+
     // Each signed-in, allowlisted user gets their own private app state.
     match /users/{uid}/app/{document=**} {
       allow read, write: if request.auth != null

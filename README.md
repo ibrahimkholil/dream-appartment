@@ -6,9 +6,10 @@ password login, supports self-signup, and stores each account's data in
 Firebase (Firestore), so it works from any device and stays in sync.
 
 - Each account has its **own private data** (separate ledger per user).
-- Signup is **invite-only**: only email addresses you add to an allowlist
-  can create an account or log in. Anyone else gets a clear "not
-  authorized" message.
+- **Anyone can sign up**, but only gets access after: (1) verifying their
+  email (Firebase sends the link automatically) and (2) you approving their
+  request by adding their email to the allowlist. See "Approving new users"
+  below.
 - 100% static site (`public/index.html`) — no server/backend to run.
 
 ## 1. Create a free Firebase project
@@ -53,21 +54,41 @@ Firebase (Firestore), so it works from any device and stays in sync.
    actual data is protected by Firestore Security Rules + the allowlist
    below, not by hiding this object.
 
-## 5. Add allowed users (the invite-only allowlist)
+## 5. Add allowed users (approve who can actually see data)
 
-Only emails listed here are allowed to sign up or log in — this is what
-makes signup "invite-only" instead of open to anyone with the link.
+Only emails listed in the `allowlist` collection can access the app's
+data — this is the final gate, regardless of how someone signed up.
 
 1. In Firestore Database, click **Start collection**.
 2. Collection ID: `allowlist`
 3. Document ID: the person's email address, **all lowercase**
    (e.g. `rahim@example.com`) — the ID itself is what matters, the document
    can have any single field, e.g. `allowed: true`.
-4. Repeat for every person you want to allow (yourself included).
+4. Repeat for every person you want to allow (yourself included, to start).
 
 To remove someone's access later, just delete their document from the
 `allowlist` collection — their existing account stops working immediately
 since every read/write is checked against this list.
+
+### Approving new users (self-signup flow)
+
+Anyone can open the app and create an account — you don't have to know
+their email in advance. Here's what happens and what you need to do:
+
+1. They sign up and Firebase automatically emails them a verification link.
+2. Once they click it and return to the app, they land on a "waiting for
+   approval" screen, and a request appears in a new `pending` collection in
+   Firestore (document ID = their user ID, with their email as a field).
+3. **To approve someone**: open Firestore Database → `pending` collection,
+   find their request, note their email, then add that email to the
+   `allowlist` collection exactly as in step 4 above. You can then delete
+   the `pending` document if you want to tidy up (not required).
+4. They click "আবার চেক করুন" (check again) on their waiting screen (or just
+   reload/re-log in) and get straight into the dashboard.
+
+Accounts you already approved before this flow existed keep working exactly
+as before — this only adds a queue for *new* sign-ups, it doesn't require
+existing users to verify their email.
 
 ## 6. Deploy the security rules
 
@@ -121,7 +142,9 @@ Hosting is only for serving the static file, and is optional.
 - `public/index.html` is the entire app (HTML/CSS/JS in one file).
 - On load it shows a login/signup screen. After a successful login, it
   checks Firestore access (which enforces the allowlist) before showing
-  the app.
+  the app. Not allowlisted yet? It shows "verify your email" (if not
+  verified) or "waiting for approval" (if verified but not yet allowlisted)
+  instead of the dashboard — see "Approving new users" above.
 - All data (shareholders, deposits, expenses, suppliers, loans) is stored
   in one Firestore document per account: `users/{uid}/app/state`. It syncs
   in real time across that user's devices and works offline (Firestore's
