@@ -313,6 +313,39 @@
   .auth-loading{text-align:center; padding:60px 10px; color:var(--ink-soft); font-size:13px;}
   .setup-screen ol{padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink);}
   .setup-screen code{background:var(--concrete-2); padding:1px 6px; border-radius:5px; font-size:12px;}
+
+  /* Sync status badge */
+  .sync-badge{font-size:10.5px; opacity:0; height:14px; margin-top:2px; transition:opacity .2s ease;}
+  .sync-badge.show{opacity:.85;}
+
+  /* Screen + content fade-in */
+  @keyframes fadeSlideIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+  .fade-in{ animation:fadeSlideIn .32s ease; }
+  .fade-in-fast{ animation:fadeIn .18s ease; }
+
+  /* Micro-interactions: press feedback */
+  .btn, .icon-btn, .fab, nav.bottom button, .report-btn, .auth-tabs button{
+    transition:transform .12s ease, box-shadow .12s ease, background-color .15s ease;
+  }
+  .btn:active, .icon-btn:active, .report-btn:active{ transform:scale(0.96); }
+  .fab:active{ transform:scale(0.9); }
+  nav.bottom button:active{ transform:scale(0.94); }
+  .stat-card, .list-item{ transition:transform .12s ease, background-color .12s ease; }
+  .stat-card:active{ transform:scale(0.98); }
+  .list-item:active{ background:var(--concrete); }
+
+  /* Modal open/close animation (opacity/visibility instead of display, so it can transition) */
+  .modal-back{
+    display:flex; opacity:0; visibility:hidden; pointer-events:none;
+    transition:opacity .22s ease, visibility 0s linear .22s;
+  }
+  .modal-back.open{
+    opacity:1; visibility:visible; pointer-events:auto;
+    transition:opacity .22s ease, visibility 0s linear 0s;
+  }
+  .modal{ transform:translateY(28px); transition:transform .28s cubic-bezier(.22,1,.36,1); }
+  .modal-back.open .modal{ transform:translateY(0); }
 </style>
 </head>
 <body>
@@ -378,6 +411,7 @@
       <div>
         <div class="brand-title">ড্রিম অ্যাপার্টমেন্ট</div>
         <div class="brand-sub" id="shareholderCountLabel">ফান্ড ট্র্যাকার</div>
+        <div class="sync-badge" id="syncBadge"></div>
       </div>
       <div class="header-actions">
         <button class="report-btn" id="reportBtn" title="রিপোর্ট / প্রিন্ট / PDF">📄</button>
@@ -511,18 +545,53 @@ function attachRealtimeListener(){
 
 async function persistNow(){
   if(!currentUser || !firebaseDb) return false;
+  setSyncState(navigator.onLine ? 'saving' : 'offline');
   try{
     await stateDocRef().set({
       data: collectState(),
       email: currentUser.email,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge:true});
+    setSyncState('saved');
     return true;
   }catch(e){
+    setSyncState('error');
     showToast('সংরক্ষণ ব্যর্থ হয়েছে: '+(e.message||'error'));
     return false;
   }
 }
+
+/* ---------------- Sync status badge ---------------- */
+let syncState = 'idle'; // idle | saving | saved | offline | error
+let syncBadgeTimer = null;
+
+function setSyncState(state){
+  syncState = state;
+  renderSyncBadge();
+  clearTimeout(syncBadgeTimer);
+  if(state === 'saved'){
+    syncBadgeTimer = setTimeout(()=>{ if(syncState==='saved'){ syncState='idle'; renderSyncBadge(); } }, 2200);
+  }
+}
+
+function renderSyncBadge(){
+  const el = document.getElementById('syncBadge');
+  if(!el) return;
+  const offline = !navigator.onLine;
+  const labels = {
+    idle: '',
+    saving: '🟡 সংরক্ষণ হচ্ছে…',
+    saved: '🟢 সংরক্ষিত',
+    offline: '🔴 অফলাইন — সংযোগ ফিরলে সিঙ্ক হবে',
+    error: '🔴 সংরক্ষণ ব্যর্থ, আবার চেষ্টা করুন'
+  };
+  const text = offline ? labels.offline : labels[syncState];
+  el.textContent = text;
+  el.classList.toggle('show', !!text);
+}
+
+window.addEventListener('online', renderSyncBadge);
+window.addEventListener('offline', renderSyncBadge);
 
 // Keeps the exact call signature used throughout the app: STATE[type] is
 // already updated by the caller; this persists the whole document.
@@ -633,15 +702,22 @@ let STATE = { shareholders:[], deposits:[], expenses:[], categories:[], supplier
 let CURRENT_TAB = 'dashboard';
 
 function showScreen(name){
-  document.getElementById('bootScreen').style.display = name==='boot' ? 'block' : 'none';
-  document.getElementById('setupScreen').style.display = name==='setup' ? 'flex' : 'none';
-  document.getElementById('authScreen').style.display = name==='auth' ? 'flex' : 'none';
-  document.getElementById('app').style.display = name==='app' ? 'flex' : 'none';
+  const map = { boot:'bootScreen', setup:'setupScreen', auth:'authScreen', app:'app' };
+  Object.entries(map).forEach(([key, id])=>{
+    const el = document.getElementById(id);
+    if(key === name){
+      el.style.display = key==='boot' ? 'block' : 'flex';
+      el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in');
+    } else {
+      el.style.display = 'none';
+    }
+  });
 }
 
 function showApp(){
   showScreen('app');
   render();
+  renderSyncBadge();
 }
 
 function showAuthScreen(message){
@@ -1073,6 +1149,7 @@ function renderHeader(){
   }
 }
 
+let __lastRenderedTab = null;
 function render(){
   renderHeader();
   const main = document.getElementById('main');
@@ -1083,6 +1160,10 @@ function render(){
   else if(CURRENT_TAB==='suppliers') main.innerHTML = renderSuppliers();
   else if(CURRENT_TAB==='loans') main.innerHTML = renderLoans();
   else if(CURRENT_TAB==='report') main.innerHTML = renderReport();
+  if(CURRENT_TAB !== __lastRenderedTab){
+    main.classList.remove('fade-in-fast'); void main.offsetWidth; main.classList.add('fade-in-fast');
+    __lastRenderedTab = CURRENT_TAB;
+  }
   attachListDeleteHandlers();
   document.getElementById('fabBtn').style.display = (CURRENT_TAB==='report') ? 'none' : 'flex';
   if(CURRENT_TAB==='report'){
