@@ -1,16 +1,19 @@
 # ড্রিম অ্যাপার্টমেন্ট — ফান্ড ট্র্যাকার
 
-A single-page Bengali fund tracker (deposits, expenses, suppliers, loans,
-shareholders) for a building/apartment project. It now requires email +
-password login, supports self-signup, and stores each account's data in
-Firebase (Firestore), so it works from any device and stays in sync.
+A Bengali fund tracker (deposits, expenses, suppliers, loans, shareholders)
+for a building/apartment project, built as a lightweight React app. It
+requires email + password login, supports self-signup, and stores each
+account's data in Firebase (Firestore), so it works from any device and
+stays in sync.
 
 - Each account has its **own private data** (separate ledger per user).
 - **Anyone can sign up**, but only gets access after: (1) verifying their
-  email (Firebase sends the link automatically) and (2) you approving their
-  request by adding their email to the allowlist. See "Approving new users"
-  below.
-- 100% static site (`public/index.html`) — no server/backend to run.
+  email (Firebase sends the link automatically) and (2) an admin approving
+  their request — either from the Firebase Console, or right inside the
+  app via the 🛡️ admin panel. See "Approving new users" below.
+- Built with **Vite + React** (no Next.js, no server) — a static site once
+  built, so it deploys to any free static host. The build step just bundles
+  the app; there's no backend to run.
 
 ## 1. Create a free Firebase project
 
@@ -35,9 +38,8 @@ Firebase (Firestore), so it works from any device and stays in sync.
 1. In Project settings (gear icon) → **Your apps** → click the `</>` (Web)
    icon → register an app (any nickname).
 2. Firebase shows a `firebaseConfig` object. Copy it.
-3. Open `public/index.html`, find `FIREBASE_CONFIG` near the top of the
-   `<script>` block, and paste your real values in place of the
-   `YOUR_...` placeholders:
+3. Open `webapp/src/firebase.js`, find `FIREBASE_CONFIG` near the top, and
+   paste your real values in place of the `YOUR_...` placeholders:
 
    ```js
    const FIREBASE_CONFIG = {
@@ -121,40 +123,55 @@ firebase use --add        # pick the project you created in step 1
 firebase deploy --only firestore:rules
 ```
 
-## 7. Deploy the app for free (Firebase Hosting)
+## 7. Build the app
 
-Firebase Hosting's free tier (10 GB storage, 360 MB/day transfer) is more
-than enough for this app, and it's the simplest choice since Auth +
-Firestore are already on Firebase.
+The app is a React project (`webapp/`) that compiles down to plain static
+files. Install [Node.js](https://nodejs.org/) once, then:
+
+```bash
+cd webapp
+npm install
+npm run build
+```
+
+This produces `webapp/dist/` — a folder of plain HTML/CSS/JS you can deploy
+anywhere. Re-run `npm run build` any time you (or I) change the code.
+
+## 8. Deploy the app for free
+
+### Option A — Firebase Hosting (simplest, since Auth + Firestore are
+already on Firebase)
 
 ```bash
 firebase deploy --only hosting
 ```
 
-The CLI prints a live URL like `https://dream-apartment-xxxx.web.app` —
-that's your app, ready to share with your allowlisted users.
+(`firebase.json` already points at `webapp/dist`.) The CLI prints a live
+URL like `https://dream-apartment-xxxx.web.app`.
 
-To push a later update, just re-run `firebase deploy --only hosting`.
+### Option B — Netlify (no local Node.js needed)
 
-### Alternative free static hosts
+Connect this GitHub repo in the Netlify dashboard and set:
 
-Since `public/index.html` is a plain static file, any of these also work
-(Firebase Auth/Firestore keep working from any domain — no changes needed):
+- **Base directory**: `webapp`
+- **Build command**: `npm run build`
+- **Publish directory**: `dist`
 
-- **Netlify** — drag-and-drop the `public` folder in the Netlify dashboard,
-  or connect this GitHub repo for auto-deploys.
-- **Vercel** — `vercel --prod` from the `public` folder, or import the repo.
-- **Cloudflare Pages** — connect the repo, set build output directory to
-  `public`.
-- **GitHub Pages** — enable Pages on this repo, serve from `/public`.
+Netlify runs the build for you in the cloud on every push — you don't need
+Node.js installed locally with this option.
 
-If you use one of these instead of Firebase Hosting, still complete steps
-1–6 above (Firebase project, Auth, Firestore, allowlist, rules) — Firebase
-Hosting is only for serving the static file, and is optional.
+### Other free static hosts
+
+**Vercel** and **Cloudflare Pages** work the same way — point them at the
+`webapp` directory with build command `npm run build` and output directory
+`dist`. Whichever host you use, still complete steps 1–6 above first
+(Firebase project, Auth, Firestore, allowlist, rules) — hosting only serves
+the built files.
 
 ## How it works
 
-- `public/index.html` is the entire app (HTML/CSS/JS in one file).
+- `webapp/` is a Vite + React app. `webapp/src/App.jsx` is the entry point;
+  screens live under `webapp/src/components/`.
 - On load it shows a login/signup screen. After a successful login, it
   checks Firestore access (which enforces the allowlist) before showing
   the app. Not allowlisted yet? It shows "verify your email" (if not
@@ -166,16 +183,18 @@ Hosting is only for serving the static file, and is optional.
   built-in offline cache), syncing again once back online.
 - The 👤 button in the header has Logout, change password, and a manual
   JSON backup download/restore (in addition to the automatic cloud sync).
+  The 🛡️ button (admins only) approves/rejects signups and manages access.
+- The PDF-generation libraries (html2canvas, jsPDF) only load when you
+  actually print/export a report, not on every page visit, to keep the
+  initial load light.
 
-## Local testing
-
-You can open `public/index.html` directly, but browsers block some
-features (like Firestore) on `file://` URLs, so serve it over HTTP instead:
+## Local development
 
 ```bash
-cd public
-python3 -m http.server 8080
-# open http://localhost:8080
+cd webapp
+npm install
+npm run dev
+# open the URL it prints (usually http://localhost:5173)
 ```
 
 If `FIREBASE_CONFIG` still has the `YOUR_...` placeholders, the app shows a
