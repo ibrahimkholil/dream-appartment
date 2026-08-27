@@ -2,25 +2,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Invite-only allowlist. Documents here are added manually by the admin
-    // via the Firebase Console (Firestore Database -> allowlist collection).
-    // Document ID = lower-cased email address, e.g. "someone@example.com".
-    // No one can read or write this collection from the app; it is only
-    // consulted internally by the rules below via exists().
-    match /allowlist/{emailId} {
-      allow read, write: if false;
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
     }
 
-    // Self-service access requests. A signed-in user with a verified email can
-    // create/update ONLY their own request document (doc ID = their uid) so the
-    // admin can review it in the Firebase Console and, once approved, add their
-    // email to the allowlist collection above. Nobody can delete these from the
-    // app (cleanup is a manual admin step) and nobody can read another user's.
+    // Admins. Bootstrapped manually via the Firebase Console (Firestore ->
+    // admins collection, document ID = lower-cased email). A user may check
+    // ONLY their own admin doc (to decide whether to show the admin panel);
+    // nobody can list the full admin roster or write to it from the app -
+    // promoting/demoting admins is a deliberate Console-only action.
+    match /admins/{emailId} {
+      allow read: if request.auth != null && request.auth.token.email != null
+        && request.auth.token.email.lower() == emailId;
+      allow write: if false;
+    }
+
+    // Access allowlist. Admins can read/manage it from the in-app admin
+    // panel; everyone else (including the app's own normal read path) only
+    // ever consults it indirectly via exists() below - never lists it.
+    match /allowlist/{emailId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Self-service access requests. The requester can create/update ONLY
+    // their own doc (doc ID = their uid) once their email is verified.
+    // Admins can read the whole queue and delete entries (after approving
+    // or rejecting) from the in-app admin panel.
     match /pending/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if (request.auth != null && request.auth.uid == uid) || isAdmin();
       allow create, update: if request.auth != null && request.auth.uid == uid
         && request.auth.token.email_verified == true;
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     // Each signed-in, allowlisted user gets their own private app state.

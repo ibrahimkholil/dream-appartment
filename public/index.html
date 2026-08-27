@@ -161,7 +161,7 @@
   nav.bottom button.active{color:var(--brick);}
 
   .fab{
-    position:fixed; left:50%; transform:translateX(calc(-50% + 190px));
+    position:fixed; right:max(16px, calc(50vw - 224px));
     bottom:76px; width:50px;height:50px;border-radius:50%;
     background:var(--brick); color:#fff; border:none; font-size:26px;
     box-shadow:0 6px 16px rgba(190,90,46,.45);
@@ -451,6 +451,7 @@
         <div class="sync-badge" id="syncBadge"></div>
       </div>
       <div class="header-actions">
+        <button class="report-btn" id="adminBtn" title="অ্যাডমিন প্যানেল" style="display:none;">🛡️</button>
         <button class="report-btn" id="reportBtn" title="রিপোর্ট / প্রিন্ট / PDF">📄</button>
         <button class="report-btn" id="accountBtn" title="অ্যাকাউন্ট ও ব্যাকআপ">👤</button>
         <div class="brick-badge"></div>
@@ -586,13 +587,27 @@ async function ensurePendingRecord(user){
 async function handleAuthenticatedUser(user){
   currentUser = user;
   const ok = await checkAccessAndLoad(user);
-  if(ok){ showApp(); return; }
+  if(ok){
+    await checkIsAdmin(user);
+    showApp();
+    return;
+  }
   if(!user.emailVerified){
     showVerifyScreen(user);
     return;
   }
   await ensurePendingRecord(user);
   showPendingScreen();
+}
+
+let isAdmin = false;
+async function checkIsAdmin(user){
+  isAdmin = false;
+  if(!user.email || !firebaseDb) return;
+  try{
+    const snap = await firebaseDb.collection('admins').doc(user.email.toLowerCase()).get();
+    isAdmin = !!snap.exists;
+  }catch(e){ isAdmin = false; }
 }
 
 function showVerifyScreen(user){
@@ -809,6 +824,107 @@ async function accountLogout(){
   }catch(e){ showToast('লগআউট ব্যর্থ হয়েছে'); }
 }
 
+/* ---------------- Admin panel: approve/reject signups, manage allowlist ---------------- */
+function fmtTimestamp(ts){
+  try{ if(ts && typeof ts.toDate === 'function') return ts.toDate().toLocaleString('bn-BD'); }catch(e){}
+  return '—';
+}
+
+async function openAdminModal(){
+  document.getElementById('modalBody').innerHTML = `
+    <h3>🛡️ অ্যাডমিন প্যানেল</h3>
+    <div class="section-title" style="margin:4px 2px 8px;">অপেক্ষমাণ আবেদন</div>
+    <div class="card" id="adminPendingList"><div class="empty">লোড হচ্ছে…</div></div>
+    <div class="section-title" style="margin:18px 2px 8px;">অনুমোদিত ইমেইল তালিকা</div>
+    <div class="card" id="adminAllowlist"><div class="empty">লোড হচ্ছে…</div></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button type="button" class="btn ghost" onclick="closeModal()">বন্ধ করুন</button>
+    </div>
+  `;
+  document.getElementById('modalBack').classList.add('open');
+  await refreshAdminModal();
+}
+
+async function refreshAdminModal(){
+  const pendingEl = document.getElementById('adminPendingList');
+  const allowEl = document.getElementById('adminAllowlist');
+  if(!pendingEl || !allowEl) return; // modal got closed meanwhile
+
+  try{
+    const snap = await firebaseDb.collection('pending').get();
+    const rows = [];
+    snap.forEach(doc=> rows.push({ uid: doc.id, ...doc.data() }));
+    pendingEl.innerHTML = rows.length ? rows.map(r=>`
+      <div class="list-item" data-uid="${esc(r.uid)}" data-email="${esc(r.email)}">
+        <div class="li-main">
+          <div class="li-title">${esc(r.email||'—')}</div>
+          <div class="li-sub">${fmtTimestamp(r.requestedAt)}</div>
+        </div>
+        <div class="li-actions">
+          <div class="icon-btn approve-btn" title="অনুমোদন করুন">✅</div>
+          <div class="icon-btn danger reject-btn" title="বাতিল করুন">✖️</div>
+        </div>
+      </div>`).join('') : '<div class="empty">কোনো অপেক্ষমাণ আবেদন নেই</div>';
+    pendingEl.querySelectorAll('.approve-btn').forEach(btn=>{
+      btn.onclick = (ev)=>{ const it=ev.target.closest('.list-item'); approvePending(it.dataset.uid, it.dataset.email); };
+    });
+    pendingEl.querySelectorAll('.reject-btn').forEach(btn=>{
+      btn.onclick = (ev)=>{ const it=ev.target.closest('.list-item'); rejectPending(it.dataset.uid); };
+    });
+  }catch(e){
+    pendingEl.innerHTML = '<div class="empty">লোড ব্যর্থ: '+esc(e.message||'')+'</div>';
+  }
+
+  try{
+    const snap = await firebaseDb.collection('allowlist').get();
+    const emails = [];
+    snap.forEach(doc=> emails.push(doc.id));
+    allowEl.innerHTML = emails.length ? emails.map(email=>`
+      <div class="list-item" data-email="${esc(email)}">
+        <div class="li-main"><div class="li-title">${esc(email)}</div></div>
+        <div class="li-actions">
+          <div class="icon-btn danger revoke-btn" title="অ্যাক্সেস বাতিল করুন">🗑</div>
+        </div>
+      </div>`).join('') : '<div class="empty">কোনো অনুমোদিত ইমেইল নেই</div>';
+    allowEl.querySelectorAll('.revoke-btn').forEach(btn=>{
+      btn.onclick = (ev)=>{ const it=ev.target.closest('.list-item'); revokeAccess(it.dataset.email); };
+    });
+  }catch(e){
+    allowEl.innerHTML = '<div class="empty">লোড ব্যর্থ: '+esc(e.message||'')+'</div>';
+  }
+}
+
+async function approvePending(uid, email){
+  if(!email) return;
+  try{
+    await firebaseDb.collection('allowlist').doc(email.toLowerCase()).set({
+      allowed: true,
+      approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      approvedBy: currentUser.email
+    });
+    await firebaseDb.collection('pending').doc(uid).delete();
+    showToast('অনুমোদিত হয়েছে: '+email);
+    refreshAdminModal();
+  }catch(e){ showToast('ব্যর্থ: '+(e.message||'')); }
+}
+
+async function rejectPending(uid){
+  try{
+    await firebaseDb.collection('pending').doc(uid).delete();
+    showToast('আবেদন বাতিল করা হয়েছে');
+    refreshAdminModal();
+  }catch(e){ showToast('ব্যর্থ: '+(e.message||'')); }
+}
+
+async function revokeAccess(email){
+  if(!confirm(email+' — এই ইমেইলের অ্যাক্সেস বাতিল করবেন? এই ইমেইল দিয়ে আর লগইন করা যাবে না।')) return;
+  try{
+    await firebaseDb.collection('allowlist').doc(email.toLowerCase()).delete();
+    showToast('অ্যাক্সেস বাতিল করা হয়েছে: '+email);
+    refreshAdminModal();
+  }catch(e){ showToast('ব্যর্থ: '+(e.message||'')); }
+}
+
 /* ---------------- Seed data ---------------- */
 function seedCategories(){
   const list = [
@@ -843,6 +959,7 @@ function showApp(){
   showScreen('app');
   render();
   renderSyncBadge();
+  document.getElementById('adminBtn').style.display = isAdmin ? 'flex' : 'none';
 }
 
 function showAuthScreen(){
@@ -1512,7 +1629,7 @@ function renderShareholders(){
   }).join('');
   return `
     <div class="section-title">শেয়ারহোল্ডার তালিকা <span class="tag">${STATE.shareholders.length} জন</span></div>
-    <div class="card">${items || '<div class="empty">এখনো কোনো শেয়ারহোল্ডার যোগ হয়নি।</div>'}</div>
+    <div class="card">${items || '<div class="empty">এখনো কোনো শেয়ারহোল্ডার যোগ হয়নি। নিচের ＋ বাটনে চাপুন।</div>'}</div>
   `;
 }
 
@@ -2273,6 +2390,7 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
   });
 });
 document.getElementById('accountBtn').addEventListener('click', ()=>{ openAccountModal(); });
+document.getElementById('adminBtn').addEventListener('click', ()=>{ openAdminModal(); });
 document.getElementById('reportBtn').addEventListener('click', ()=>{
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
   CURRENT_TAB = 'report';
