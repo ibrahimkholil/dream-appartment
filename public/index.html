@@ -1,0 +1,2091 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>ড্রিম অ্যাপার্টমেন্ট — ফান্ড ট্র্যাকার</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Da+2:wght@500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#16233E;
+    --navy-2:#22355A;
+    --brick:#BE5A2E;
+    --brick-dark:#9C4623;
+    --rebar:#4C7A6E;
+    --concrete:#EFEDE8;
+    --concrete-2:#E3E0D8;
+    --card:#FFFFFF;
+    --ink:#1F2933;
+    --ink-soft:#5B6570;
+    --line:#DCD8CD;
+    --danger:#B3402B;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--concrete);
+    color:var(--ink);
+    font-family:'Noto Sans Bengali','Inter',sans-serif;
+    overscroll-behavior-y:none;
+  }
+  .num{font-family:'Inter','Noto Sans Bengali',sans-serif; font-variant-numeric: tabular-nums;}
+  h1,h2,h3,.display{font-family:'Baloo Da 2','Noto Sans Bengali',sans-serif;}
+
+  /* App shell */
+  #app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--concrete);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+
+  header.top{
+    background:linear-gradient(155deg,var(--navy) 0%, var(--navy-2) 100%);
+    color:#fff;
+    padding:18px 18px 22px;
+    position:sticky; top:0; z-index:20;
+    border-bottom-left-radius:20px;
+    border-bottom-right-radius:20px;
+    box-shadow:0 6px 18px rgba(22,35,62,0.25);
+  }
+  header.top .brand{
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header.top .brand-title{
+    font-family:'Baloo Da 2',sans-serif;
+    font-size:19px; font-weight:700; letter-spacing:.2px;
+  }
+  header.top .brand-sub{
+    font-size:11px; opacity:.7; margin-top:2px;
+  }
+  .brick-badge{
+    width:34px;height:34px;border-radius:9px;
+    background:repeating-linear-gradient(0deg, var(--brick) 0 6px, var(--brick-dark) 6px 7px);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.15);
+  }
+
+  /* Brick progress bar (signature element) */
+  .brickbar-wrap{margin-top:16px;}
+  .brickbar-labels{display:flex; justify-content:space-between; font-size:11px; opacity:.85; margin-bottom:6px;}
+  .brickbar{
+    display:flex; gap:2px; height:16px; border-radius:5px; overflow:hidden;
+    background:rgba(255,255,255,.12);
+    padding:2px;
+  }
+  .brickbar .brick{
+    flex:1 1 0; background:rgba(255,255,255,.18); border-radius:2px;
+  }
+  .brickbar .brick.filled{ background:var(--brick); }
+
+  main{
+    flex:1;
+    padding:16px 14px 96px;
+  }
+
+  .card{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:14px 15px;
+    margin-bottom:12px;
+    box-shadow:0 1px 3px rgba(22,35,62,0.06);
+    border:1px solid var(--line);
+  }
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px 13px;
+  }
+  .stat-label{font-size:11.5px; color:var(--ink-soft); margin-bottom:4px;}
+  .stat-value{font-size:19px; font-weight:700;}
+  .stat-value.pos{color:var(--rebar);}
+  .stat-value.neg{color:var(--danger);}
+
+  .section-title{
+    font-size:14px; font-weight:700; color:var(--navy);
+    margin:18px 2px 10px; display:flex; align-items:center; gap:6px;
+  }
+  .section-title .tag{
+    font-size:10px; font-weight:600; background:var(--concrete-2); color:var(--ink-soft);
+    padding:2px 7px; border-radius:20px; font-family:'Noto Sans Bengali';
+  }
+
+  .list-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:11px 4px; border-bottom:1px solid var(--line);
+    gap:10px;
+  }
+  .list-item:last-child{border-bottom:none;}
+  .li-main{min-width:0;}
+  .li-title{font-size:14px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .li-sub{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .li-amt{font-size:14.5px; font-weight:700; white-space:nowrap;}
+  .li-actions{display:flex; gap:6px; margin-left:6px;}
+  .icon-btn{
+    width:28px;height:28px;border-radius:8px;border:1px solid var(--line);
+    background:var(--concrete); display:flex;align-items:center;justify-content:center;
+    font-size:13px; color:var(--ink-soft); cursor:pointer;
+  }
+  .icon-btn.danger{color:var(--danger); border-color:#eccec6;}
+
+  .empty{
+    text-align:center; padding:30px 10px; color:var(--ink-soft); font-size:13px;
+  }
+
+  /* Bottom nav */
+  nav.bottom{
+    position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:480px;
+    background:#fff; border-top:1px solid var(--line);
+    display:flex; z-index:30;
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 14px rgba(22,35,62,0.08);
+  }
+  nav.bottom button{
+    flex:1; background:none; border:none; padding:6px 1px 4px;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    color:var(--ink-soft); font-family:'Noto Sans Bengali'; font-size:9.6px;
+    cursor:pointer; min-width:0;
+  }
+  nav.bottom button .ic{font-size:16px;}
+  nav.bottom button.active{color:var(--brick);}
+
+  .fab{
+    position:fixed; left:50%; transform:translateX(calc(-50% + 190px));
+    bottom:76px; width:50px;height:50px;border-radius:50%;
+    background:var(--brick); color:#fff; border:none; font-size:26px;
+    box-shadow:0 6px 16px rgba(190,90,46,.45);
+    display:flex;align-items:center;justify-content:center; z-index:30; cursor:pointer;
+  }
+
+  .tabpage{display:none;}
+  .tabpage.active{display:block;}
+
+  /* Modal */
+  .modal-back{
+    position:fixed; inset:0; background:rgba(22,35,62,.45); z-index:50;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-back.open{display:flex;}
+  .modal{
+    background:#fff; width:100%; max-width:480px; border-radius:20px 20px 0 0;
+    padding:18px 18px calc(18px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto;
+  }
+  .modal h3{margin:0 0 14px; font-size:17px; color:var(--navy);}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:12px; color:var(--ink-soft); margin-bottom:5px; font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:10px 11px; border-radius:10px; border:1.4px solid var(--line);
+    font-family:'Noto Sans Bengali','Inter'; font-size:14.5px; background:var(--concrete);
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none; border-color:var(--brick); background:#fff;
+  }
+  .field input[readonly]{
+    background:var(--concrete-2); color:var(--ink-soft); cursor:not-allowed;
+  }
+  .field-row{display:flex; gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-actions{display:flex; gap:10px; margin-top:6px;}
+  .btn{
+    flex:1; padding:12px; border-radius:11px; border:none; font-size:14.5px; font-weight:700;
+    font-family:'Noto Sans Bengali'; cursor:pointer;
+  }
+  .btn.primary{background:var(--brick); color:#fff;}
+  .btn.ghost{background:var(--concrete-2); color:var(--ink);}
+
+  .confirm-strip{
+    display:flex; align-items:center; gap:8px; background:#FBEDE7; border:1px solid #EFC9B7;
+    padding:8px 10px; border-radius:10px; font-size:12.5px; margin-top:6px;
+  }
+  .confirm-strip button{border:none; background:var(--danger); color:#fff; padding:5px 10px; border-radius:7px; font-size:11.5px; font-weight:700;}
+  .confirm-strip button.cancel{background:var(--concrete-2); color:var(--ink);}
+
+  .toast{
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+    background:var(--navy); color:#fff; padding:10px 18px; border-radius:30px;
+    font-size:12.5px; z-index:60; opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+
+  .catchip{
+    display:inline-block; font-size:10.5px; background:var(--concrete-2); color:var(--ink-soft);
+    padding:2px 8px; border-radius:20px; margin:2px 4px 0 0;
+  }
+  .loading{text-align:center; padding:60px 10px; color:var(--ink-soft); font-size:13px;}
+
+  /* Report button in header */
+  .header-actions{display:flex; align-items:center; gap:8px;}
+  .report-btn{
+    width:34px;height:34px;border-radius:9px; border:1px solid rgba(255,255,255,.25);
+    background:rgba(255,255,255,.08); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:16px; cursor:pointer;
+  }
+
+  /* Report page */
+  .report-toolbar{display:flex; gap:10px; margin-bottom:14px;}
+  .report-toolbar .btn{flex:1;}
+  .report-meta{font-size:11.5px; color:var(--ink-soft); margin:-4px 0 12px;}
+  .report-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .report-table th, .report-table td{
+    padding:6px 7px; text-align:left; border-bottom:1px solid var(--line);
+  }
+  .report-table th{color:var(--ink-soft); font-weight:600; font-size:11px;}
+  .report-table td.num, .report-table th.num{text-align:right; font-family:'Inter','Noto Sans Bengali',sans-serif;}
+  .report-table tfoot td{font-weight:700; border-top:1.5px solid var(--navy); border-bottom:none;}
+  .report-section-title{
+    font-size:13.5px; font-weight:700; color:var(--navy); margin:20px 2px 8px;
+  }
+  .report-section-title:first-child{margin-top:2px;}
+  .print-title{display:none;}
+
+  /* Voucher print area (single-document print) */
+  #printArea{display:none;}
+  .voucher-box{max-width:480px; margin:0 auto; border:1.5px solid #16233E; padding:20px; font-family:'Noto Sans Bengali',sans-serif; color:#1F2933;}
+  .voucher-box .v-head{text-align:center; margin-bottom:4px;}
+  .voucher-box .v-head h2{margin:0; font-size:17px; color:var(--navy);}
+  .voucher-box .v-head .v-sub{font-size:11px; color:#5B6570;}
+  .voucher-box .v-type{
+    text-align:center; font-weight:700; font-size:13px; margin:10px 0 14px;
+    border-top:1px solid #999; border-bottom:1px solid #999; padding:5px 0; letter-spacing:.5px;
+  }
+  .voucher-box .v-row{display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed #ccc; font-size:13px;}
+  .voucher-box .v-row .k{color:#5B6570;}
+  .voucher-box .v-row .v{font-weight:600; text-align:right;}
+  .voucher-amt-box{margin:16px 0; padding:12px; border:1.4px solid #16233E; text-align:center; font-size:17px; font-weight:700; border-radius:6px;}
+  .voucher-sign{display:flex; justify-content:space-between; margin-top:56px; font-size:11.5px;}
+  .voucher-sign div{width:30%; text-align:center; border-top:1px solid #333; padding-top:5px;}
+
+  /* Print styles: only the report content prints, formatted as a clean document */
+  @media print{
+    body{background:#fff;}
+    header.top, nav.bottom, .fab, .modal-back, .toast, .report-toolbar{display:none !important;}
+    #app{max-width:none; box-shadow:none;}
+    main{padding:0; margin:0;}
+    .print-title{display:block; margin-bottom:14px;}
+    .print-title h1{font-size:19px; color:var(--navy); margin:0 0 2px;}
+    .print-title .sub{font-size:11.5px; color:var(--ink-soft);}
+    .card{box-shadow:none; border:1px solid #ccc; break-inside:avoid;}
+    .report-section-title{break-after:avoid;}
+    .stat-grid{break-inside:avoid;}
+    @page{margin:14mm 10mm;}
+    body.printing-single #app{display:none !important;}
+    body.printing-single #printArea{display:block !important;}
+  }
+
+.cloud-status{padding:10px 12px;border-radius:10px;background:#f5f7fb;margin:10px 0;font-size:13px}.muted{font-size:12px;opacity:.72;line-height:1.5}.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.modal-actions .btn{flex:1;min-width:130px}
+
+  /* Auth screen */
+  .auth-screen{
+    max-width:420px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column;
+    justify-content:center; padding:28px 22px; gap:16px;
+  }
+  .auth-brand{text-align:center; margin-bottom:6px;}
+  .auth-brand .brick-badge{width:46px;height:46px;border-radius:12px;margin:0 auto 12px;}
+  .auth-brand h1{margin:0; font-size:21px; color:var(--navy);}
+  .auth-brand .sub{font-size:12.5px; color:var(--ink-soft); margin-top:4px;}
+  .auth-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px 18px; box-shadow:0 1px 3px rgba(22,35,62,0.06);
+  }
+  .auth-tabs{display:flex; gap:6px; margin-bottom:16px; background:var(--concrete); border-radius:11px; padding:4px;}
+  .auth-tabs button{
+    flex:1; border:none; background:none; padding:9px 6px; border-radius:8px; font-size:13.5px;
+    font-weight:700; color:var(--ink-soft); font-family:'Noto Sans Bengali'; cursor:pointer;
+  }
+  .auth-tabs button.active{background:#fff; color:var(--brick); box-shadow:0 1px 2px rgba(22,35,62,.12);}
+  .auth-msg{font-size:12.5px; padding:9px 11px; border-radius:9px; margin-bottom:12px; display:none;}
+  .auth-msg.show{display:block;}
+  .auth-msg.err{background:#FBEDE7; color:var(--danger); border:1px solid #EFC9B7;}
+  .auth-msg.ok{background:#EAF3EF; color:var(--rebar); border:1px solid #CFE6DD;}
+  .auth-forgot{display:block; text-align:right; font-size:12px; color:var(--ink-soft); margin:-6px 0 12px; cursor:pointer; text-decoration:underline;}
+  .auth-loading{text-align:center; padding:60px 10px; color:var(--ink-soft); font-size:13px;}
+  .setup-screen ol{padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink);}
+  .setup-screen code{background:var(--concrete-2); padding:1px 6px; border-radius:5px; font-size:12px;}
+</style>
+</head>
+<body>
+
+<div id="bootScreen" class="auth-loading">লোড হচ্ছে…</div>
+
+<div id="setupScreen" class="auth-screen setup-screen" style="display:none">
+  <div class="auth-brand">
+    <div class="brick-badge" style="margin:0 auto 12px;"></div>
+    <h1>Firebase সেটআপ প্রয়োজন</h1>
+    <div class="sub">এই অ্যাপটি চালানোর আগে একবার Firebase প্রজেক্ট কনফিগার করতে হবে।</div>
+  </div>
+  <div class="auth-card">
+    <ol>
+      <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a>-এ গিয়ে একটি নতুন প্রজেক্ট তৈরি করুন (ফ্রি Spark প্ল্যান)।</li>
+      <li>Build → Authentication → Sign-in method থেকে <b>Email/Password</b> চালু করুন।</li>
+      <li>Build → Firestore Database থেকে একটি ডাটাবেজ তৈরি করুন।</li>
+      <li>Project settings → Your apps → Web app যোগ করে কনফিগার অবজেক্ট কপি করুন।</li>
+      <li>সেই মান <code>public/index.html</code> ফাইলের <code>FIREBASE_CONFIG</code> ভেরিয়েবলে বসান (README.md দেখুন)।</li>
+      <li>Firestore-এ <code>allowlist</code> কালেকশনে যাদের অনুমতি দিতে চান তাদের ইমেইল যোগ করুন।</li>
+    </ol>
+    <p class="muted">বিস্তারিত ধাপে ধাপে নির্দেশনা রিপোজিটরির README.md ফাইলে আছে।</p>
+  </div>
+</div>
+
+<div id="authScreen" class="auth-screen" style="display:none">
+  <div class="auth-brand">
+    <div class="brick-badge" style="margin:0 auto 12px;"></div>
+    <h1>ড্রিম অ্যাপার্টমেন্ট</h1>
+    <div class="sub">ফান্ড ট্র্যাকার — লগইন করুন</div>
+  </div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button type="button" id="authTabLogin" class="active">লগইন</button>
+      <button type="button" id="authTabSignup">নতুন অ্যাকাউন্ট</button>
+    </div>
+    <div class="auth-msg" id="authMsg"></div>
+    <form id="authForm">
+      <div class="field">
+        <label>ইমেইল</label>
+        <input type="email" id="authEmail" required autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label>পাসওয়ার্ড</label>
+        <input type="password" id="authPassword" required autocomplete="current-password" placeholder="কমপক্ষে ৬ অক্ষর" minlength="6">
+      </div>
+      <div class="field" id="authConfirmField" style="display:none">
+        <label>পাসওয়ার্ড নিশ্চিত করুন</label>
+        <input type="password" id="authPasswordConfirm" autocomplete="new-password" placeholder="আবার পাসওয়ার্ড দিন" minlength="6">
+      </div>
+      <span class="auth-forgot" id="authForgotBtn">পাসওয়ার্ড ভুলে গেছেন?</span>
+      <div class="modal-actions" style="margin-top:0;">
+        <button type="submit" class="btn primary" id="authSubmitBtn" style="flex:1 1 100%;">লগইন করুন</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+
+  <header class="top">
+    <div class="brand">
+      <div>
+        <div class="brand-title">ড্রিম অ্যাপার্টমেন্ট</div>
+        <div class="brand-sub" id="shareholderCountLabel">ফান্ড ট্র্যাকার</div>
+      </div>
+      <div class="header-actions">
+        <button class="report-btn" id="reportBtn" title="রিপোর্ট / প্রিন্ট / PDF">📄</button>
+        <button class="report-btn" id="accountBtn" title="অ্যাকাউন্ট ও ব্যাকআপ">👤</button>
+        <div class="brick-badge"></div>
+      </div>
+    </div>
+    <div class="brickbar-wrap">
+      <div class="brickbar-labels">
+        <span id="collectedPct">সংগ্রহ ০%</span>
+        <span id="collectedOfTotal">৳০ / ৳০</span>
+      </div>
+      <div class="brickbar" id="brickbar"></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="loading" id="loadingMsg">লোড হচ্ছে…</div>
+  </main>
+
+  <button class="fab" id="fabBtn">＋</button>
+
+  <nav class="bottom">
+    <button data-tab="dashboard" class="navbtn active"><span class="ic">🏠</span>হোম</button>
+    <button data-tab="deposits" class="navbtn"><span class="ic">💰</span>জমা</button>
+    <button data-tab="expenses" class="navbtn"><span class="ic">🧾</span>খরচ</button>
+    <button data-tab="suppliers" class="navbtn"><span class="ic">🏗️</span>পাওনাদার</button>
+    <button data-tab="loans" class="navbtn"><span class="ic">🏦</span>লোন</button>
+    <button data-tab="shareholders" class="navbtn"><span class="ic">👥</span>সদস্য</button>
+  </nav>
+</div>
+
+<div class="modal-back" id="modalBack">
+  <div class="modal" id="modalBody"></div>
+</div>
+<div class="toast" id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+/* ---------------- Storage: Firestore per-account, offline-capable ---------------- */
+const APP_KEYS = ['shareholders','deposits','expenses','categories','suppliers','supplierPayments','loans','loanPayments'];
+
+// Paste your Firebase project's Web App config here (Firebase Console → Project settings →
+// Your apps → Web app). This value is NOT a secret — Firestore Security Rules + the
+// invite-only allowlist protect the actual data. See README.md for full setup steps.
+const FIREBASE_CONFIG = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_PROJECT.firebaseapp.com',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_PROJECT.appspot.com',
+  messagingSenderId: 'YOUR_SENDER_ID',
+  appId: 'YOUR_APP_ID'
+};
+
+let firebaseApp = null, firebaseAuth = null, firebaseDb = null;
+let currentUser = null, unsubscribeState = null, applyingRemote = false;
+
+function localGet(key){
+  try { const v = localStorage.getItem('dream_apartment_'+key); return v ? JSON.parse(v) : null; } catch(e){ return null; }
+}
+function localSet(key,val){
+  try { localStorage.setItem('dream_apartment_'+key, JSON.stringify(val)); return true; } catch(e){ return false; }
+}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function firebaseConfigured(){
+  return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId && !FIREBASE_CONFIG.apiKey.startsWith('YOUR_'));
+}
+
+function initFirebase(){
+  if(!firebaseConfigured()) return false;
+  try{
+    firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseAuth = firebase.auth();
+    firebaseDb = firebase.firestore();
+    try{ firebaseDb.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
+    return true;
+  }catch(e){ console.warn('Firebase init failed', e); return false; }
+}
+
+function stateDocRef(){
+  return firebaseDb.collection('users').doc(currentUser.uid).collection('app').doc('state');
+}
+
+function collectState(){
+  const out = {};
+  APP_KEYS.forEach(k=> out[k] = STATE[k] || []);
+  return out;
+}
+
+function applyState(data){
+  const isNew = !data;
+  APP_KEYS.forEach(k=>{
+    if(data && Array.isArray(data[k])) STATE[k] = data[k];
+    else if(k==='categories') STATE[k] = seedCategories();
+    else STATE[k] = [];
+  });
+  if(currentUser) localSet('cache_'+currentUser.uid, collectState());
+  return isNew;
+}
+
+/* Called once per login: reads the user's document (this read is what the
+   Firestore security rules use to enforce the invite-only allowlist — it
+   rejects with a permission-denied error for emails that are not allowed). */
+async function checkAccessAndLoad(user){
+  currentUser = user;
+  try{
+    const snap = await stateDocRef().get();
+    const isNew = applyState(snap.exists ? snap.data().data : null);
+    attachRealtimeListener();
+    if(isNew) await persistNow();
+    return true;
+  }catch(e){
+    console.warn('Access check failed', e);
+    currentUser = null;
+    return false;
+  }
+}
+
+function attachRealtimeListener(){
+  if(unsubscribeState){ try{ unsubscribeState(); }catch(e){} unsubscribeState = null; }
+  unsubscribeState = stateDocRef().onSnapshot(snap=>{
+    if(snap.metadata.hasPendingWrites) return; // skip echo of our own in-flight write
+    applyingRemote = true;
+    applyState(snap.exists ? snap.data().data : null);
+    applyingRemote = false;
+    render();
+  }, err=>{ console.warn('Realtime listener error', err); });
+}
+
+async function persistNow(){
+  if(!currentUser || !firebaseDb) return false;
+  try{
+    await stateDocRef().set({
+      data: collectState(),
+      email: currentUser.email,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+    return true;
+  }catch(e){
+    showToast('সংরক্ষণ ব্যর্থ হয়েছে: '+(e.message||'error'));
+    return false;
+  }
+}
+
+// Keeps the exact call signature used throughout the app: STATE[type] is
+// already updated by the caller; this persists the whole document.
+async function saveKey(key, val){
+  STATE[key] = val;
+  if(applyingRemote) return true;
+  return persistNow();
+}
+
+function downloadBackup(){
+  const payload = {app:'Dream Apartment App', version:1, exportedAt:new Date().toISOString(), data:collectState()};
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'dream-apartment-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+  showToast('Backup file ডাউনলোড হয়েছে');
+}
+
+function restoreBackupFile(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    try{
+      const payload = JSON.parse(reader.result);
+      const data = payload.data || payload;
+      if(!data || typeof data !== 'object') throw new Error('invalid');
+      if(!confirm('Backup থেকে ডাটা Restore করলে বর্তমান ডাটা এই ডাটা দিয়ে প্রতিস্থাপিত হবে। চালিয়ে যাবেন?')) return;
+      for(const k of APP_KEYS){
+        if(Array.isArray(data[k])) STATE[k]=data[k];
+      }
+      await persistNow();
+      render(); showToast('Backup Restore সম্পন্ন হয়েছে');
+    }catch(e){ showToast('Backup file সঠিক নয়'); }
+  };
+  reader.readAsText(file);
+}
+
+function openAccountModal(){
+  document.getElementById('modalBody').innerHTML=`
+    <h3>👤 অ্যাকাউন্ট</h3>
+    <div class="cloud-status">🟢 লগইন করা আছে: ${esc(currentUser?currentUser.email:'—')}</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="openChangePasswordForm()">🔑 পাসওয়ার্ড পরিবর্তন</button>
+      <button class="btn" onclick="accountLogout()">🚪 লগআউট</button>
+    </div>
+    <hr>
+    <div class="modal-actions">
+      <button class="btn primary" onclick="downloadBackup()">⬇️ Backup Download</button>
+      <button class="btn" onclick="document.getElementById('restoreFile').click()">⬆️ Backup Restore</button>
+    </div>
+    <input id="restoreFile" type="file" accept="application/json,.json" style="display:none" onchange="restoreBackupFile(this.files[0])">
+    <p class="muted">ডাটা স্বয়ংক্রিয়ভাবে Cloud-এ সংরক্ষিত ও সিঙ্ক হয় — আলাদা করে আপলোড/ডাউনলোড করার দরকার নেই। এই ব্যাকআপ শুধু অতিরিক্ত সুরক্ষার জন্য।</p>`;
+  document.getElementById('modalBack').classList.add('open');
+}
+
+function openChangePasswordForm(){
+  document.getElementById('modalBody').innerHTML=`
+    <h3>🔑 পাসওয়ার্ড পরিবর্তন</h3>
+    <div class="auth-msg" id="pwMsg"></div>
+    <div class="field"><label>বর্তমান পাসওয়ার্ড</label><input type="password" id="pwCurrent" autocomplete="current-password"></div>
+    <div class="field"><label>নতুন পাসওয়ার্ড</label><input type="password" id="pwNew" autocomplete="new-password" minlength="6"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="openAccountModal()">ফিরে যান</button>
+      <button class="btn primary" onclick="submitChangePassword()">সংরক্ষণ করুন</button>
+    </div>`;
+}
+
+async function submitChangePassword(){
+  const cur = document.getElementById('pwCurrent').value;
+  const next = document.getElementById('pwNew').value;
+  const msg = document.getElementById('pwMsg');
+  if(!cur || !next || next.length<6){ msg.textContent='সঠিক বর্তমান ও নতুন পাসওয়ার্ড দিন (কমপক্ষে ৬ অক্ষর)'; msg.className='auth-msg err show'; return; }
+  try{
+    const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, cur);
+    await currentUser.reauthenticateWithCredential(cred);
+    await currentUser.updatePassword(next);
+    showToast('পাসওয়ার্ড পরিবর্তন হয়েছে');
+    openAccountModal();
+  }catch(e){
+    msg.textContent = 'ব্যর্থ: '+(e.message||'unknown error');
+    msg.className='auth-msg err show';
+  }
+}
+
+async function accountLogout(){
+  try{
+    if(unsubscribeState){ try{ unsubscribeState(); }catch(e){} unsubscribeState=null; }
+    await firebaseAuth.signOut();
+    closeModal();
+  }catch(e){ showToast('লগআউট ব্যর্থ হয়েছে'); }
+}
+
+/* ---------------- Seed data ---------------- */
+function seedCategories(){
+  const list = [
+    ["রড ক্রয়","কেজি"],["সিমেন্ট ক্রয়","বস্তা"],["সাদা বালু ক্রয়","সিএফটি"],
+    ["লাল বালু ক্রয়","সিএফটি"],["পাথর ক্রয়","সিএফটি"],["ইটা ক্রয়","পিস"],
+    ["প্রিন্টিং ও স্টেশনারী",""],["ইটের খোয়া","সিএফটি"],["যাতায়াত",""],
+    ["রাজ কন্ট্রাক্টর",""],["সেনেটারী মালামাল",""],["বিদ্যুতের মালামাল",""],
+    ["সেনেটারী কন্ট্রাক্টর",""],["বিদ্যুতের কন্ট্রাক্টর",""],["দৈনিক মজুরি",""],
+    ["ডিজাইন ও রাজউক প্লান",""],["বেতন",""],["সার্ভিস চার্জ",""]
+  ];
+  return list.map(([name,unit])=>({id:uid(), name, unit}));
+}
+
+/* ---------------- State ---------------- */
+let STATE = { shareholders:[], deposits:[], expenses:[], categories:[], suppliers:[], supplierPayments:[], loans:[], loanPayments:[] };
+let CURRENT_TAB = 'dashboard';
+
+function showScreen(name){
+  document.getElementById('bootScreen').style.display = name==='boot' ? 'block' : 'none';
+  document.getElementById('setupScreen').style.display = name==='setup' ? 'flex' : 'none';
+  document.getElementById('authScreen').style.display = name==='auth' ? 'flex' : 'none';
+  document.getElementById('app').style.display = name==='app' ? 'flex' : 'none';
+}
+
+function showApp(){
+  showScreen('app');
+  render();
+}
+
+function showAuthScreen(message){
+  showScreen('auth');
+  const el = document.getElementById('authMsg');
+  if(message){ el.textContent = message; el.className = 'auth-msg err show'; }
+  else { el.textContent=''; el.className='auth-msg'; }
+}
+
+let pendingAuthMessage = null;
+
+function bootstrapApp(){
+  wireAuthScreen();
+  if(!initFirebase()){ showScreen('setup'); return; }
+  firebaseAuth.onAuthStateChanged(async user=>{
+    if(user){
+      const ok = await checkAccessAndLoad(user);
+      if(ok){
+        showApp();
+      } else {
+        pendingAuthMessage = 'এই ইমেইল দিয়ে অ্যাপটি ব্যবহারের অনুমতি নেই। অ্যাডমিনের সাথে যোগাযোগ করুন।';
+        try{ await firebaseAuth.signOut(); }catch(e){}
+      }
+    } else {
+      currentUser = null;
+      if(unsubscribeState){ try{ unsubscribeState(); }catch(e){} unsubscribeState=null; }
+      showAuthScreen(pendingAuthMessage);
+      pendingAuthMessage = null;
+    }
+  });
+}
+
+/* ---------------- Auth screen wiring ---------------- */
+let authMode = 'login';
+
+function setAuthMode(mode){
+  authMode = mode;
+  document.getElementById('authTabLogin').classList.toggle('active', mode==='login');
+  document.getElementById('authTabSignup').classList.toggle('active', mode==='signup');
+  document.getElementById('authConfirmField').style.display = mode==='signup' ? '' : 'none';
+  document.getElementById('authPasswordConfirm').required = mode==='signup';
+  document.getElementById('authPassword').autocomplete = mode==='signup' ? 'new-password' : 'current-password';
+  document.getElementById('authSubmitBtn').textContent = mode==='signup' ? 'অ্যাকাউন্ট তৈরি করুন' : 'লগইন করুন';
+  document.getElementById('authMsg').className = 'auth-msg';
+}
+
+function wireAuthScreen(){
+  document.getElementById('authTabLogin').onclick = ()=> setAuthMode('login');
+  document.getElementById('authTabSignup').onclick = ()=> setAuthMode('signup');
+  document.getElementById('authForgotBtn').onclick = handleForgotPassword;
+  document.getElementById('authForm').onsubmit = handleAuthSubmit;
+}
+
+function authErrorMessage(e){
+  const map = {
+    'auth/invalid-email':'সঠিক ইমেইল ঠিকানা দিন',
+    'auth/user-not-found':'এই ইমেইলে কোনো অ্যাকাউন্ট নেই',
+    'auth/wrong-password':'পাসওয়ার্ড সঠিক নয়',
+    'auth/email-already-in-use':'এই ইমেইলে ইতিমধ্যে অ্যাকাউন্ট আছে, লগইন করুন',
+    'auth/weak-password':'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে',
+    'auth/invalid-credential':'ইমেইল বা পাসওয়ার্ড সঠিক নয়',
+    'auth/too-many-requests':'অনেকবার চেষ্টা করা হয়েছে, কিছুক্ষণ পর আবার চেষ্টা করুন'
+  };
+  return map[e.code] || (e.message || 'একটি সমস্যা হয়েছে, আবার চেষ্টা করুন');
+}
+
+async function handleAuthSubmit(ev){
+  ev.preventDefault();
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const confirm = document.getElementById('authPasswordConfirm').value;
+  const msg = document.getElementById('authMsg');
+  const btn = document.getElementById('authSubmitBtn');
+  if(!email || !password){ msg.textContent='ইমেইল ও পাসওয়ার্ড দিন'; msg.className='auth-msg err show'; return; }
+  if(authMode==='signup' && password!==confirm){ msg.textContent='পাসওয়ার্ড মিলছে না'; msg.className='auth-msg err show'; return; }
+  btn.disabled = true;
+  msg.className = 'auth-msg';
+  try{
+    if(authMode==='signup') await firebaseAuth.createUserWithEmailAndPassword(email, password);
+    else await firebaseAuth.signInWithEmailAndPassword(email, password);
+  }catch(e){
+    msg.textContent = authErrorMessage(e);
+    msg.className = 'auth-msg err show';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handleForgotPassword(){
+  const email = document.getElementById('authEmail').value.trim();
+  const msg = document.getElementById('authMsg');
+  if(!email){ msg.textContent='আগে ইমেইল লিখুন, তারপর আবার চাপুন'; msg.className='auth-msg err show'; return; }
+  try{
+    await firebaseAuth.sendPasswordResetEmail(email);
+    msg.textContent = 'পাসওয়ার্ড রিসেট লিংক ইমেইলে পাঠানো হয়েছে';
+    msg.className = 'auth-msg ok show';
+  }catch(e){
+    msg.textContent = authErrorMessage(e);
+    msg.className = 'auth-msg err show';
+  }
+}
+
+/* ---------------- Utils ---------------- */
+function money(n){
+  n = Number(n)||0;
+  return '৳' + n.toLocaleString('en-IN', {maximumFractionDigits:2});
+}
+function totalExpense(){ return STATE.expenses.reduce((s,e)=> s + (Number(e.total)||0), 0); }
+function totalReceived(){ return STATE.deposits.reduce((s,d)=> s + (Number(d.amount)||0), 0); }
+function totalShares(){ return STATE.shareholders.reduce((s,p)=> s + (Number(p.shares)||0), 0); }
+function perShareCost(){ const ts = totalShares(); return ts>0 ? totalExpense()/ts : 0; }
+function shareholderPaid(name){
+  return STATE.deposits.filter(d=>d.name===name).reduce((s,d)=> s+(Number(d.amount)||0),0);
+}
+
+/* --- Suppliers / creditors --- */
+function supplierInvoiced(id){ return STATE.expenses.filter(e=>e.supplierId===id).reduce((s,e)=> s+(Number(e.total)||0),0); }
+function supplierPaidAtPurchase(id){ return STATE.expenses.filter(e=>e.supplierId===id).reduce((s,e)=> s+(Number(e.paidNow)||0),0); }
+function supplierPaymentsTotal(id){ return STATE.supplierPayments.filter(p=>p.supplierId===id).reduce((s,p)=> s+(Number(p.amount)||0),0); }
+function supplierDue(id){ return supplierInvoiced(id) - supplierPaidAtPurchase(id) - supplierPaymentsTotal(id); }
+function totalSupplierDue(){ return STATE.suppliers.reduce((s,sup)=> s + supplierDue(sup.id), 0); }
+function cashPaidToSuppliers(){ return STATE.supplierPayments.reduce((s,p)=> s+(Number(p.amount)||0),0); }
+function cashPaidForExpenses(){
+  return STATE.expenses.reduce((s,e)=>{
+    if(e.supplierId) return s + (Number(e.paidNow)||0);
+    return s + (Number(e.total)||0);
+  },0);
+}
+
+/* --- Personal loan accounts --- */
+function loanRepaid(id){ return STATE.loanPayments.filter(p=>p.loanId===id).reduce((s,p)=> s+(Number(p.amount)||0),0); }
+function loanBalance(loan){ return (Number(loan.principal)||0) - loanRepaid(loan.id); }
+function loansByType(type){ return STATE.loans.filter(l=>l.type===type); }
+function totalLoanPayable(){ return loansByType('payable').reduce((s,l)=> s+loanBalance(l),0); }
+function totalLoanReceivable(){ return loansByType('receivable').reduce((s,l)=> s+loanBalance(l),0); }
+function loanCashInflowOutflow(){
+  const payablePrincipal = loansByType('payable').reduce((s,l)=> s+(Number(l.principal)||0),0);
+  const payableRepaid = STATE.loanPayments.filter(p=>{ const l=STATE.loans.find(x=>x.id===p.loanId); return l && l.type==='payable'; }).reduce((s,p)=> s+(Number(p.amount)||0),0);
+  const receivablePrincipal = loansByType('receivable').reduce((s,l)=> s+(Number(l.principal)||0),0);
+  const receivableRepaid = STATE.loanPayments.filter(p=>{ const l=STATE.loans.find(x=>x.id===p.loanId); return l && l.type==='receivable'; }).reduce((s,p)=> s+(Number(p.amount)||0),0);
+  return payablePrincipal - payableRepaid - receivablePrincipal + receivableRepaid;
+}
+
+/* --- Cash in hand: deposits minus actual cash paid out, adjusted for loans --- */
+function cashInHand(){
+  return totalReceived() - cashPaidForExpenses() - cashPaidToSuppliers() + loanCashInflowOutflow();
+}
+function fmtDate(d){
+  if(!d) return '—';
+  return d;
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ---------------- Share (Email / WhatsApp) ---------------- */
+function shareViaEmail(subject, body){
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+function shareViaWhatsApp(text){
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+/* ---------------- PDF generation (html2canvas + jsPDF) ---------------- */
+async function htmlToPdfBlob(innerHtml){
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '480px';
+  container.style.background = '#ffffff';
+  container.style.padding = '18px';
+  container.style.fontFamily = "'Noto Sans Bengali','Inter',sans-serif";
+  container.innerHTML = `<div class="print-title" style="display:block;"></div>` + innerHtml;
+  document.body.appendChild(container);
+  await new Promise(r=>setTimeout(r, 60));
+  try{
+    const canvas = await html2canvas(container, {scale:2, backgroundColor:'#ffffff', useCORS:true});
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({unit:'mm', format:'a4'});
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = canvas.height * imgWidth / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    let heightLeft = imgHeight, position = 0;
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+    while(heightLeft > 0){
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    return pdf.output('blob');
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+async function sharePdfReport(via, innerHtml, filename, subject, textBody){
+  showToast('PDF তৈরি হচ্ছে...');
+  let blob;
+  try{
+    blob = await htmlToPdfBlob(innerHtml);
+  }catch(e){
+    showToast('PDF তৈরি ব্যর্থ হয়েছে, আবার চেষ্টা করুন');
+    return;
+  }
+  const file = new File([blob], filename, {type:'application/pdf'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title: subject, text: textBody});
+      return;
+    }catch(e){
+      // user cancelled or share failed — fall through to manual fallback
+      if(e && e.name === 'AbortError') return;
+    }
+  }
+  // Fallback: download the PDF and open the email/WhatsApp composer with a note to attach it
+  downloadBlob(blob, filename);
+  const note = '\n\n(পিডিএফ ফাইলটি ডাউনলোড হয়েছে — এটি ম্যানুয়ালি সংযুক্ত করে পাঠান)';
+  if(via==='email') shareViaEmail(subject, textBody + note);
+  else shareViaWhatsApp(textBody + note);
+  showToast('PDF ডাউনলোড হয়েছে, সংযুক্ত করে পাঠান');
+}
+
+/* ---------------- Single-document print (vouchers / individual reports) ---------------- */
+function printVoucher(html){
+  const area = document.getElementById('printArea');
+  area.innerHTML = html;
+  closeModal();
+  document.body.classList.add('printing-single');
+  setTimeout(()=> window.print(), 50);
+}
+window.addEventListener('afterprint', ()=>{
+  document.body.classList.remove('printing-single');
+  document.getElementById('printArea').innerHTML = '';
+});
+
+function voucherNo(prefix, id){ return prefix + '-' + String(id).slice(-6).toUpperCase(); }
+
+function receiveVoucherHtml(d){
+  if(!d) return '<div class="voucher-box">তথ্য পাওয়া যায়নি</div>';
+  return `
+    <div class="voucher-box">
+      <div class="v-head">
+        <h2>ড্রিম অ্যাপার্টমেন্ট</h2>
+        <div class="v-sub">ফান্ড ট্র্যাকার — জমা রশিদ</div>
+      </div>
+      <div class="v-type">রিসিভ ভাউচার / MONEY RECEIPT</div>
+      <div class="v-row"><span class="k">রশিদ নং</span><span class="v">${esc(d.receipt||voucherNo('MR', d.id))}</span></div>
+      <div class="v-row"><span class="k">তারিখ</span><span class="v">${fmtDate(d.date)}</span></div>
+      <div class="v-row"><span class="k">শেয়ারহোল্ডারের নাম</span><span class="v">${esc(d.name)}</span></div>
+      <div class="v-row"><span class="k">পেমেন্ট মাধ্যম</span><span class="v">${esc(d.method||'—')}</span></div>
+      <div class="v-row"><span class="k">মন্তব্য</span><span class="v">${esc(d.notes||'—')}</span></div>
+      <div class="voucher-amt-box">গৃহীত পরিমাণ: ${money(d.amount)}</div>
+      <div class="voucher-sign">
+        <div>প্রদানকারীর স্বাক্ষর</div>
+        <div>প্রস্তুতকারী</div>
+        <div>গ্রহীতার স্বাক্ষর</div>
+      </div>
+    </div>
+  `;
+}
+
+function expenseVoucherHtml(e){
+  if(!e) return '<div class="voucher-box">তথ্য পাওয়া যায়নি</div>';
+  const sup = e.supplierId ? STATE.suppliers.find(s=>s.id===e.supplierId) : null;
+  return `
+    <div class="voucher-box">
+      <div class="v-head">
+        <h2>ড্রিম অ্যাপার্টমেন্ট</h2>
+        <div class="v-sub">ফান্ড ট্র্যাকার — খরচের ভাউচার</div>
+      </div>
+      <div class="v-type">এক্সপেন্স ভাউচার / EXPENSE VOUCHER</div>
+      <div class="v-row"><span class="k">ভাউচার নং</span><span class="v">${esc(e.voucher||voucherNo('EXP', e.id))}</span></div>
+      <div class="v-row"><span class="k">তারিখ</span><span class="v">${fmtDate(e.date)}</span></div>
+      <div class="v-row"><span class="k">খাত</span><span class="v">${esc(e.category||'—')}</span></div>
+      ${e.qty? `<div class="v-row"><span class="k">পরিমাণ / একক দর</span><span class="v">${e.qty} ${esc(e.unit||'')} × ${money(e.rate)}</span></div>`:''}
+      ${sup? `<div class="v-row"><span class="k">সাপ্লায়ার</span><span class="v">${esc(sup.name)}</span></div>
+      <div class="v-row"><span class="k">এখনই পরিশোধ</span><span class="v">${money(e.paidNow)}</span></div>` : ''}
+      <div class="v-row"><span class="k">অনুমোদনকারী</span><span class="v">${esc(e.approvedBy||'—')}</span></div>
+      <div class="v-row"><span class="k">মন্তব্য</span><span class="v">${esc(e.notes||'—')}</span></div>
+      <div class="voucher-amt-box">মোট খরচ: ${money(e.total)}</div>
+      <div class="voucher-sign">
+        <div>প্রস্তুতকারী</div>
+        <div>অনুমোদনকারী</div>
+        <div>গ্রহীতার স্বাক্ষর</div>
+      </div>
+    </div>
+  `;
+}
+
+function paymentVoucherHtml(kind, payment, entityId){
+  if(!payment) return '<div class="voucher-box">তথ্য পাওয়া যায়নি</div>';
+  let name = '', label = '';
+  if(kind==='supplier'){
+    const sup = STATE.suppliers.find(s=>s.id===entityId);
+    name = sup ? sup.name : '';
+    label = 'সাপ্লায়ার পেমেন্ট';
+  } else {
+    const loan = STATE.loans.find(l=>l.id===entityId);
+    name = loan ? loan.person : '';
+    label = loan && loan.type==='payable' ? 'লোন পরিশোধ (আমরা দিচ্ছি)' : 'লোন ফেরত গ্রহণ (আমরা পাচ্ছি)';
+  }
+  return `
+    <div class="voucher-box">
+      <div class="v-head">
+        <h2>ড্রিম অ্যাপার্টমেন্ট</h2>
+        <div class="v-sub">ফান্ড ট্র্যাকার — পেমেন্ট ভাউচার</div>
+      </div>
+      <div class="v-type">পেমেন্ট ভাউচার / PAYMENT VOUCHER</div>
+      <div class="v-row"><span class="k">ভাউচার নং</span><span class="v">${voucherNo('PAY', payment.id)}</span></div>
+      <div class="v-row"><span class="k">তারিখ</span><span class="v">${fmtDate(payment.date)}</span></div>
+      <div class="v-row"><span class="k">প্রাপক / সংশ্লিষ্ট</span><span class="v">${esc(name)}</span></div>
+      <div class="v-row"><span class="k">ধরন</span><span class="v">${esc(label)}</span></div>
+      <div class="v-row"><span class="k">মন্তব্য</span><span class="v">${esc(payment.notes||'—')}</span></div>
+      <div class="voucher-amt-box">পরিমাণ: ${money(payment.amount)}</div>
+      <div class="voucher-sign">
+        <div>প্রদানকারী</div>
+        <div>অনুমোদনকারী</div>
+        <div>গ্রহীতার স্বাক্ষর</div>
+      </div>
+    </div>
+  `;
+}
+
+function shareholderLedgerReportHtml(shId){
+  const p = STATE.shareholders.find(x=>x.id===shId);
+  if(!p) return '<div class="voucher-box">তথ্য পাওয়া যায়নি</div>';
+  const deps = STATE.deposits.filter(d=>d.name===p.name).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const paid = shareholderPaid(p.name);
+  const psc = perShareCost();
+  const shareOfCost = psc*Number(p.shares||0);
+  const dueAmt = shareOfCost - paid;
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+  const depRows = deps.map(d=>
+    `<tr><td>${fmtDate(d.date)}</td><td>${esc(d.receipt||'')}</td><td>${esc(d.method||'')}</td><td class="num">${money(d.amount)}</td></tr>`).join('');
+  return `
+    <div class="print-title" style="display:block;">
+      <h1>শেয়ারহোল্ডার পার্সোনাল লেজার</h1>
+      <div class="sub">তৈরি হয়েছে: ${genDate}</div>
+    </div>
+    <div class="card">
+      <table class="report-table">
+        <tr><td>নাম</td><td class="num">${esc(p.name)}</td></tr>
+        <tr><td>মোবাইল</td><td class="num">${esc(p.phone||'—')}</td></tr>
+        <tr><td>শেয়ার সংখ্যা</td><td class="num">${p.shares}</td></tr>
+        <tr><td>প্রতি শেয়ার খরচ</td><td class="num">${money(psc)}</td></tr>
+        <tr><td>তার প্রাপ্য অংশ (শেয়ার অনুযায়ী খরচ)</td><td class="num">${money(shareOfCost)}</td></tr>
+        <tr><td>মোট জমা</td><td class="num">${money(paid)}</td></tr>
+        <tr><td>${dueAmt<=0?'অগ্রিম':'বকেয়া'}</td><td class="num">${money(Math.abs(dueAmt))}</td></tr>
+      </table>
+    </div>
+    <div class="report-section-title">জমার বিস্তারিত</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>তারিখ</th><th>রশিদ</th><th>মাধ্যম</th><th class="num">পরিমাণ</th></tr></thead>
+        <tbody>${depRows || '<tr><td colspan="4" class="empty">কোনো জমা নেই</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="3">মোট</td><td class="num">${money(paid)}</td></tr></tfoot>
+      </table>
+    </div>
+    <div class="voucher-sign" style="max-width:480px; margin:56px auto 0;">
+      <div>প্রস্তুতকারী</div>
+      <div>অনুমোদনকারী</div>
+      <div>শেয়ারহোল্ডারের স্বাক্ষর</div>
+    </div>
+  `;
+}
+
+/* ---------------- Shareholder Personal Ledger: plain text (Email / WhatsApp) ---------------- */
+function shareholderLedgerSummaryText(shId){
+  const p = STATE.shareholders.find(x=>x.id===shId);
+  if(!p) return '';
+  const deps = STATE.deposits.filter(d=>d.name===p.name).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const paid = shareholderPaid(p.name);
+  const psc = perShareCost();
+  const shareOfCost = psc*Number(p.shares||0);
+  const dueAmt = shareOfCost - paid;
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+  const depLines = deps.map(d=>
+    `• ${fmtDate(d.date)} — ${d.receipt||'—'} (${d.method||'—'}): ${money(d.amount)}`).join('\n');
+  return [
+    `শেয়ারহোল্ডার পার্সোনাল লেজার — ${p.name}`,
+    `তৈরি হয়েছে: ${genDate}`,
+    '',
+    `মোবাইল: ${p.phone||'—'}`,
+    `শেয়ার সংখ্যা: ${p.shares}`,
+    `প্রতি শেয়ার খরচ: ${money(psc)}`,
+    `প্রাপ্য অংশ: ${money(shareOfCost)}`,
+    `মোট জমা: ${money(paid)}`,
+    `${dueAmt<=0?'অগ্রিম':'বকেয়া'}: ${money(Math.abs(dueAmt))}`,
+    '',
+    'জমার বিস্তারিত:',
+    depLines || 'কোনো জমা নেই',
+  ].join('\n');
+}
+
+/* ---------------- Render: shell ---------------- */
+function renderHeader(){
+  document.getElementById('shareholderCountLabel').textContent =
+    STATE.shareholders.length + ' জন শেয়ারহোল্ডার · ফান্ড ট্র্যাকার';
+  const exp = totalExpense(), rec = totalReceived();
+  const target = Math.max(exp, rec, 1);
+  const pct = Math.min(100, Math.round((rec/target)*100));
+  document.getElementById('collectedPct').textContent = 'সংগ্রহ ' + pct + '%';
+  document.getElementById('collectedOfTotal').textContent = money(rec) + ' / ' + money(exp);
+  const bar = document.getElementById('brickbar');
+  const segCount = 24;
+  const filled = Math.round((pct/100)*segCount);
+  bar.innerHTML = '';
+  for(let i=0;i<segCount;i++){
+    const d = document.createElement('div');
+    d.className = 'brick' + (i<filled ? ' filled':'');
+    bar.appendChild(d);
+  }
+}
+
+function render(){
+  renderHeader();
+  const main = document.getElementById('main');
+  if(CURRENT_TAB==='dashboard') main.innerHTML = renderDashboard();
+  else if(CURRENT_TAB==='deposits') main.innerHTML = renderDeposits();
+  else if(CURRENT_TAB==='expenses') main.innerHTML = renderExpenses();
+  else if(CURRENT_TAB==='shareholders') main.innerHTML = renderShareholders();
+  else if(CURRENT_TAB==='suppliers') main.innerHTML = renderSuppliers();
+  else if(CURRENT_TAB==='loans') main.innerHTML = renderLoans();
+  else if(CURRENT_TAB==='report') main.innerHTML = renderReport();
+  attachListDeleteHandlers();
+  document.getElementById('fabBtn').style.display = (CURRENT_TAB==='report') ? 'none' : 'flex';
+  if(CURRENT_TAB==='report'){
+    const pb = document.getElementById('printReportBtn');
+    if(pb) pb.onclick = ()=> window.print();
+    const shb = document.getElementById('printShareholderReportBtn');
+    if(shb) shb.onclick = ()=> printVoucher(shareholderReportHtml());
+    const exb = document.getElementById('printExpenseReportBtn');
+    if(exb) exb.onclick = ()=> printVoucher(expenseReportHtml());
+
+    const reEmail = document.getElementById('shareReportEmailBtn');
+    if(reEmail) reEmail.onclick = ()=> sharePdfReport('email', fullReportBodyHtml(), 'সম্পূর্ণ-রিপোর্ট.pdf', 'ড্রিম অ্যাপার্টমেন্ট — সম্পূর্ণ রিপোর্ট', fullReportSummaryText());
+    const reWa = document.getElementById('shareReportWaBtn');
+    if(reWa) reWa.onclick = ()=> sharePdfReport('whatsapp', fullReportBodyHtml(), 'সম্পূর্ণ-রিপোর্ট.pdf', 'ড্রিম অ্যাপার্টমেন্ট — সম্পূর্ণ রিপোর্ট', fullReportSummaryText());
+
+    const shEmail = document.getElementById('shareShareholderEmailBtn');
+    if(shEmail) shEmail.onclick = ()=> sharePdfReport('email', shareholderReportHtml(), 'শেয়ারহোল্ডার-রিপোর্ট.pdf', 'ড্রিম অ্যাপার্টমেন্ট — শেয়ারহোল্ডার রিপোর্ট', shareholderReportSummaryText());
+    const shWa = document.getElementById('shareShareholderWaBtn');
+    if(shWa) shWa.onclick = ()=> sharePdfReport('whatsapp', shareholderReportHtml(), 'শেয়ারহোল্ডার-রিপোর্ট.pdf', 'ড্রিম অ্যাপার্টমেন্ট — শেয়ারহোল্ডার রিপোর্ট', shareholderReportSummaryText());
+
+    const exEmail = document.getElementById('shareExpenseEmailBtn');
+    if(exEmail) exEmail.onclick = ()=> sharePdfReport('email', expenseReportHtml(), 'এক্সপেন্স-রিপোর্ট.pdf', 'ড্রিম অ্যাপার্টমেন্ট — এক্সপেন্স রিপোর্ট', expenseReportSummaryText());
+    const exWa = document.getElementById('shareExpenseWaBtn');
+    if(exWa) exWa.onclick = ()=> sharePdfReport('whatsapp', expenseReportHtml(), 'এক্সপেন্স-রিপোর্ট.pdf', 'ড্রিম অ্যাপার্টমেন্ট — এক্সপেন্স রিপোর্ট', expenseReportSummaryText());
+  }
+}
+
+/* ---------------- Dashboard ---------------- */
+function renderDashboard(){
+  const exp = totalExpense(), rec = totalReceived(), cash = cashInHand(), psc = perShareCost();
+  const supDue = totalSupplierDue(), loanPay = totalLoanPayable(), loanRec = totalLoanReceivable();
+  // category breakdown
+  const byCat = {};
+  STATE.expenses.forEach(e=>{
+    const c = e.category || 'অন্যান্য';
+    byCat[c] = (byCat[c]||0) + (Number(e.total)||0);
+  });
+  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([c,v])=>`
+    <div class="list-item">
+      <div class="li-main"><div class="li-title">${esc(c)}</div></div>
+      <div class="li-amt num">${money(v)}</div>
+    </div>`).join('');
+
+  const topSuppliers = [...STATE.suppliers].map(s=>({...s, due:supplierDue(s.id)}))
+    .filter(s=>s.due>0).sort((a,b)=>b.due-a.due).slice(0,5)
+    .map(s=>`<div class="list-item"><div class="li-main"><div class="li-title">${esc(s.name)}</div></div><div class="li-amt num neg">${money(s.due)}</div></div>`).join('');
+
+  const activeLoans = [...STATE.loans].map(l=>({...l, bal:loanBalance(l)}))
+    .filter(l=>l.bal>0).sort((a,b)=>b.bal-a.bal).slice(0,5)
+    .map(l=>`<div class="list-item"><div class="li-main"><div class="li-title">${esc(l.person)}</div><div class="li-sub">${l.type==='payable'?'আমরা দেব':'আমরা পাব'}</div></div><div class="li-amt num ${l.type==='payable'?'neg':'pos'}">${money(l.bal)}</div></div>`).join('');
+
+  return `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">মোট খরচ</div>
+        <div class="stat-value num">${money(exp)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">মোট জমা</div>
+        <div class="stat-value num pos">${money(rec)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">হাতে ক্যাশ</div>
+        <div class="stat-value num ${cash>=0?'pos':'neg'}">${money(cash)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">প্রতি শেয়ার খরচ</div>
+        <div class="stat-value num">${money(psc)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">সাপ্লায়ার বাকি</div>
+        <div class="stat-value num ${supDue>0?'neg':''}">${money(supDue)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">লোন — আমরা দেব</div>
+        <div class="stat-value num ${loanPay>0?'neg':''}">${money(loanPay)}</div>
+      </div>
+      <div class="stat-card" style="grid-column:1/-1;">
+        <div class="stat-label">লোন — আমরা পাব</div>
+        <div class="stat-value num ${loanRec>0?'pos':''}">${money(loanRec)}</div>
+      </div>
+    </div>
+
+    <div class="section-title">খাত অনুযায়ী খরচ <span class="tag">${Object.keys(byCat).length} খাত</span></div>
+    <div class="card">${catRows || '<div class="empty">এখনো কোনো খরচ যোগ হয়নি</div>'}</div>
+
+    <div class="section-title">সবচেয়ে বেশি বাকি — সাপ্লায়ার <span class="tag">${STATE.suppliers.length} জন</span></div>
+    <div class="card">${topSuppliers || '<div class="empty">কোনো বকেয়া নেই</div>'}</div>
+
+    <div class="section-title">সক্রিয় লোন হিসাব <span class="tag">${STATE.loans.length} টি</span></div>
+    <div class="card">${activeLoans || '<div class="empty">কোনো লোন হিসাব নেই</div>'}</div>
+
+    <div class="section-title">সংক্ষিপ্ত তথ্য</div>
+    <div class="card">
+      <div class="list-item"><div class="li-title">মোট শেয়ারহোল্ডার</div><div class="li-amt num">${STATE.shareholders.length} জন</div></div>
+      <div class="list-item"><div class="li-title">মোট শেয়ার সংখ্যা</div><div class="li-amt num">${totalShares()}</div></div>
+      <div class="list-item"><div class="li-title">মোট জমার এন্ট্রি</div><div class="li-amt num">${STATE.deposits.length}</div></div>
+      <div class="list-item"><div class="li-title">মোট খরচের এন্ট্রি</div><div class="li-amt num">${STATE.expenses.length}</div></div>
+    </div>
+  `;
+}
+
+/* ---------------- Deposits ---------------- */
+function renderDeposits(){
+  const rows = [...STATE.deposits].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const items = rows.map(d=>`
+    <div class="list-item" data-type="deposits" data-id="${d.id}">
+      <div class="li-main">
+        <div class="li-title">${esc(d.name||'—')}</div>
+        <div class="li-sub">${fmtDate(d.date)} · ${esc(d.receipt||'')} ${d.method? '· '+esc(d.method):''}</div>
+      </div>
+      <div class="li-amt num pos">${money(d.amount)}</div>
+      <div class="li-actions">
+        <div class="icon-btn print-btn" data-kind="deposit" data-id="${d.id}" title="রিসিভ ভাউচার প্রিন্ট">🖨</div>
+        <div class="icon-btn edit-btn">✎</div>
+        <div class="icon-btn danger del-btn">🗑</div>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="section-title">জমার তালিকা <span class="tag">${STATE.deposits.length} এন্ট্রি</span></div>
+    <div class="card">${items || '<div class="empty">এখনো কোনো জমা যোগ হয়নি। নিচের ＋ বাটনে চাপুন।</div>'}</div>
+  `;
+}
+
+/* ---------------- Expenses ---------------- */
+function renderExpenses(){
+  const rows = [...STATE.expenses].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const items = rows.map(e=>{
+    const sup = e.supplierId ? STATE.suppliers.find(s=>s.id===e.supplierId) : null;
+    const due = sup ? (Number(e.total)||0) - (Number(e.paidNow)||0) : 0;
+    return `
+    <div class="list-item" data-type="expenses" data-id="${e.id}">
+      <div class="li-main">
+        <div class="li-title">${esc(e.category||'—')} ${e.voucher? '<span class="li-sub" style="display:inline">· '+esc(e.voucher)+'</span>':''}</div>
+        <div class="li-sub">${fmtDate(e.date)} ${e.qty? '· '+e.qty+' '+esc(e.unit||''):''} ${e.approvedBy? '· '+esc(e.approvedBy):''}</div>
+        ${sup? `<div class="li-sub">🏗️ ${esc(sup.name)} ${due>0? '· বাকি '+money(due) : '· সম্পূর্ণ পরিশোধ'}</div>` : ''}
+      </div>
+      <div class="li-amt num neg">${money(e.total)}</div>
+      <div class="li-actions">
+        <div class="icon-btn print-btn" data-kind="expense" data-id="${e.id}" title="খরচের ভাউচার প্রিন্ট">🖨</div>
+        <div class="icon-btn edit-btn">✎</div>
+        <div class="icon-btn danger del-btn">🗑</div>
+      </div>
+    </div>`;}).join('');
+  return `
+    <div class="section-title">খরচের তালিকা <span class="tag">${STATE.expenses.length} এন্ট্রি</span></div>
+    <div class="card">${items || '<div class="empty">এখনো কোনো খরচ যোগ হয়নি। নিচের ＋ বাটনে চাপুন।</div>'}</div>
+  `;
+}
+
+/* ---------------- Suppliers / Creditors ---------------- */
+function renderSuppliers(){
+  const rows = [...STATE.suppliers].sort((a,b)=> supplierDue(b.id)-supplierDue(a.id));
+  const items = rows.map(s=>{
+    const invoiced = supplierInvoiced(s.id);
+    const paid = supplierPaidAtPurchase(s.id) + supplierPaymentsTotal(s.id);
+    const due = supplierDue(s.id);
+    return `
+    <div class="list-item" data-type="suppliers" data-id="${s.id}">
+      <div class="li-main">
+        <div class="li-title">${esc(s.name)}</div>
+        <div class="li-sub">${esc(s.phone||'')} · চালান ${money(invoiced)} · পরিশোধ ${money(paid)}</div>
+      </div>
+      <div class="li-amt num ${due>0?'neg':'pos'}">${due>0? 'বাকি '+money(due) : 'ক্লিয়ার'}</div>
+      <div class="li-actions">
+        <div class="icon-btn pay-btn" data-kind="supplier" data-id="${s.id}" title="পেমেন্ট করুন">💵</div>
+        <div class="icon-btn ledger-btn" data-kind="supplier" data-id="${s.id}" title="লেনদেন ইতিহাস / ভাউচার">🧾</div>
+        <div class="icon-btn edit-btn">✎</div>
+        <div class="icon-btn danger del-btn">🗑</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="section-title">পাওনাদার / সাপ্লায়ার <span class="tag">${STATE.suppliers.length} জন</span></div>
+    <div class="card">${items || '<div class="empty">এখনো কোনো সাপ্লায়ার যোগ হয়নি। নিচের ＋ বাটনে চাপুন।</div>'}</div>
+  `;
+}
+
+/* ---------------- Personal Loan Accounts ---------------- */
+function renderLoans(){
+  const rows = [...STATE.loans].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  const items = rows.map(l=>{
+    const repaid = loanRepaid(l.id);
+    const bal = loanBalance(l);
+    return `
+    <div class="list-item" data-type="loans" data-id="${l.id}">
+      <div class="li-main">
+        <div class="li-title">${esc(l.person)} <span class="catchip">${l.type==='payable'?'আমরা দেব':'আমরা পাব'}</span></div>
+        <div class="li-sub">${fmtDate(l.date)} · আসল ${money(l.principal)} · পরিশোধ ${money(repaid)}</div>
+      </div>
+      <div class="li-amt num ${l.type==='payable'?'neg':'pos'}">${money(bal)}</div>
+      <div class="li-actions">
+        <div class="icon-btn pay-btn" data-kind="loan" data-id="${l.id}" title="পেমেন্ট করুন">💵</div>
+        <div class="icon-btn ledger-btn" data-kind="loan" data-id="${l.id}" title="লেনদেন ইতিহাস / ভাউচার">🧾</div>
+        <div class="icon-btn edit-btn">✎</div>
+        <div class="icon-btn danger del-btn">🗑</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="section-title">পার্সোনাল লোন হিসাব <span class="tag">${STATE.loans.length} টি</span></div>
+    <div class="card">${items || '<div class="empty">এখনো কোনো লোন হিসাব যোগ হয়নি। নিচের ＋ বাটনে চাপুন।</div>'}</div>
+  `;
+}
+
+/* ---------------- Shareholders ---------------- */
+function renderShareholders(){
+  const rows = [...STATE.shareholders].sort((a,b)=> a.name.localeCompare(b.name));
+  const items = rows.map(p=>{
+    const paid = shareholderPaid(p.name);
+    const due = perShareCost()*Number(p.shares||0) - paid;
+    return `
+    <div class="list-item" data-type="shareholders" data-id="${p.id}">
+      <div class="li-main">
+        <div class="li-title">${esc(p.name)}</div>
+        <div class="li-sub">${esc(p.phone||'')} · শেয়ার ${p.shares} · জমা ${money(paid)}</div>
+      </div>
+      <div class="li-amt num ${due<=0?'pos':'neg'}">${due<=0? 'অগ্রিম ' : 'বকেয়া '}${money(Math.abs(due))}</div>
+      <div class="li-actions">
+        <div class="icon-btn ledger-btn" data-kind="shareholder" data-id="${p.id}" title="পার্সোনাল লেজার / রিপোর্ট">📄</div>
+        <div class="icon-btn edit-btn">✎</div>
+        <div class="icon-btn danger del-btn">🗑</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="section-title">শেয়ারহোল্ডার তালিকা <span class="tag">${STATE.shareholders.length} জন</span></div>
+    <div class="card">${items || '<div class="empty">এখনো কোনো শেয়ারহোল্ডার যোগ হয়নি।</div>'}</div>
+  `;
+}
+
+/* ---------------- Full Report (print / PDF) ---------------- */
+function reportToolbarHtml(){
+  return `
+    <div class="report-toolbar" style="flex-wrap:wrap;">
+      <button class="btn primary" id="printReportBtn" style="flex-basis:100%;">🖨️ সম্পূর্ণ রিপোর্ট প্রিন্ট / PDF</button>
+      <button class="btn ghost" id="shareReportEmailBtn" style="flex:1;">✉️ ইমেইলে PDF পাঠান</button>
+      <button class="btn ghost" id="shareReportWaBtn" style="flex:1;">💬 হোয়াটসঅ্যাপে PDF পাঠান</button>
+    </div>
+    <div class="report-toolbar" style="flex-wrap:wrap; margin-top:8px;">
+      <button class="btn ghost" id="printShareholderReportBtn" style="flex:1;">👥 শেয়ারহোল্ডার রিপোর্ট</button>
+      <button class="btn ghost" id="shareShareholderEmailBtn" title="ইমেইলে PDF পাঠান" style="flex:0 0 auto;">✉️</button>
+      <button class="btn ghost" id="shareShareholderWaBtn" title="হোয়াটসঅ্যাপে PDF পাঠান" style="flex:0 0 auto;">💬</button>
+    </div>
+    <div class="report-toolbar" style="flex-wrap:wrap; margin-top:8px;">
+      <button class="btn ghost" id="printExpenseReportBtn" style="flex:1;">🧾 এক্সপেন্স রিপোর্ট</button>
+      <button class="btn ghost" id="shareExpenseEmailBtn" title="ইমেইলে PDF পাঠান" style="flex:0 0 auto;">✉️</button>
+      <button class="btn ghost" id="shareExpenseWaBtn" title="হোয়াটসঅ্যাপে PDF পাঠান" style="flex:0 0 auto;">💬</button>
+    </div>
+  `;
+}
+function fullReportBodyHtml(){
+  const exp = totalExpense(), rec = totalReceived(), cash = cashInHand(), psc = perShareCost();
+  const supDue = totalSupplierDue(), loanPay = totalLoanPayable(), loanRec = totalLoanReceivable();
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+
+  const byCat = {};
+  STATE.expenses.forEach(e=>{
+    const c = e.category || 'অন্যান্য';
+    byCat[c] = (byCat[c]||0) + (Number(e.total)||0);
+  });
+  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>
+    `<tr><td>${esc(c)}</td><td class="num">${money(v)}</td></tr>`).join('');
+
+  const shRows = [...STATE.shareholders].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const paid = shareholderPaid(p.name);
+    const due = psc*Number(p.shares||0) - paid;
+    return `<tr><td>${esc(p.name)}</td><td class="num">${p.shares}</td><td class="num">${money(paid)}</td><td class="num">${due<=0?'অগ্রিম ':'বকেয়া '}${money(Math.abs(due))}</td></tr>`;
+  }).join('');
+
+  const depRows = [...STATE.deposits].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d=>
+    `<tr><td>${fmtDate(d.date)}</td><td>${esc(d.name)}</td><td>${esc(d.receipt||'')}</td><td class="num">${money(d.amount)}</td></tr>`).join('');
+
+  const expRows = [...STATE.expenses].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(e=>
+    `<tr><td>${fmtDate(e.date)}</td><td>${esc(e.category||'')}</td><td>${esc(e.voucher||'')}</td><td class="num">${money(e.total)}</td></tr>`).join('');
+
+  const supRows = [...STATE.suppliers].sort((a,b)=>supplierDue(b.id)-supplierDue(a.id)).map(s=>{
+    const invoiced = supplierInvoiced(s.id);
+    const paid = supplierPaidAtPurchase(s.id) + supplierPaymentsTotal(s.id);
+    const due = supplierDue(s.id);
+    return `<tr><td>${esc(s.name)}</td><td class="num">${money(invoiced)}</td><td class="num">${money(paid)}</td><td class="num">${money(due)}</td></tr>`;
+  }).join('');
+
+  const loanRows = [...STATE.loans].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(l=>{
+    const repaid = loanRepaid(l.id);
+    const bal = loanBalance(l);
+    return `<tr><td>${esc(l.person)}</td><td>${l.type==='payable'?'আমরা দেব':'আমরা পাব'}</td><td class="num">${money(l.principal)}</td><td class="num">${money(repaid)}</td><td class="num">${money(bal)}</td></tr>`;
+  }).join('');
+
+  return `
+    <div class="print-title">
+      <h1>ড্রিম অ্যাপার্টমেন্ট — সম্পূর্ণ রিপোর্ট</h1>
+      <div class="sub">তৈরি হয়েছে: ${genDate}</div>
+    </div>
+    <div class="report-meta">রিপোর্ট তৈরির তারিখ ও সময়: ${genDate}</div>
+
+    <div class="section-title">সারসংক্ষেপ</div>
+    <div class="card">
+      <table class="report-table">
+        <tr><td>মোট খরচ</td><td class="num">${money(exp)}</td></tr>
+        <tr><td>মোট জমা</td><td class="num">${money(rec)}</td></tr>
+        <tr><td>হাতে ক্যাশ</td><td class="num">${money(cash)}</td></tr>
+        <tr><td>প্রতি শেয়ার খরচ</td><td class="num">${money(psc)}</td></tr>
+        <tr><td>সাপ্লায়ার বাকি</td><td class="num">${money(supDue)}</td></tr>
+        <tr><td>লোন — আমরা দেব</td><td class="num">${money(loanPay)}</td></tr>
+        <tr><td>লোন — আমরা পাব</td><td class="num">${money(loanRec)}</td></tr>
+      </table>
+    </div>
+
+    <div class="section-title">খাত অনুযায়ী খরচ</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>খাত</th><th class="num">পরিমাণ</th></tr></thead>
+        <tbody>${catRows || '<tr><td colspan="2" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title">শেয়ারহোল্ডার তালিকা</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>নাম</th><th class="num">শেয়ার</th><th class="num">জমা</th><th class="num">অবস্থা</th></tr></thead>
+        <tbody>${shRows || '<tr><td colspan="4" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title">জমার তালিকা</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>তারিখ</th><th>নাম</th><th>রসিদ</th><th class="num">পরিমাণ</th></tr></thead>
+        <tbody>${depRows || '<tr><td colspan="4" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="3">মোট</td><td class="num">${money(rec)}</td></tr></tfoot>
+      </table>
+    </div>
+
+    <div class="section-title">খরচের তালিকা</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>তারিখ</th><th>খাত</th><th>ভাউচার</th><th class="num">পরিমাণ</th></tr></thead>
+        <tbody>${expRows || '<tr><td colspan="4" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="3">মোট</td><td class="num">${money(exp)}</td></tr></tfoot>
+      </table>
+    </div>
+
+    <div class="section-title">পাওনাদার / সাপ্লায়ার</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>নাম</th><th class="num">চালান</th><th class="num">পরিশোধ</th><th class="num">বাকি</th></tr></thead>
+        <tbody>${supRows || '<tr><td colspan="4" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="section-title">পার্সোনাল লোন হিসাব</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>নাম</th><th>ধরন</th><th class="num">আসল</th><th class="num">পরিশোধ</th><th class="num">বাকি</th></tr></thead>
+        <tbody>${loanRows || '<tr><td colspan="5" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+function renderReport(){
+  return reportToolbarHtml() + fullReportBodyHtml();
+}
+
+/* ---------------- Full Report: plain text (Email / WhatsApp) ---------------- */
+function fullReportSummaryText(){
+  const exp = totalExpense(), rec = totalReceived(), cash = cashInHand(), psc = perShareCost();
+  const supDue = totalSupplierDue(), loanPay = totalLoanPayable(), loanRec = totalLoanReceivable();
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+
+  const byCat = {};
+  STATE.expenses.forEach(e=>{
+    const c = e.category || 'অন্যান্য';
+    byCat[c] = (byCat[c]||0) + (Number(e.total)||0);
+  });
+  const catLines = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
+    .map(([c,v])=> `• ${c}: ${money(v)}`).join('\n');
+
+  const shLines = [...STATE.shareholders].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const paid = shareholderPaid(p.name);
+    const due = psc*Number(p.shares||0) - paid;
+    return `• ${p.name} (শেয়ার ${p.shares}): জমা ${money(paid)}, ${due<=0?'অগ্রিম':'বকেয়া'} ${money(Math.abs(due))}`;
+  }).join('\n');
+
+  return [
+    'ড্রিম অ্যাপার্টমেন্ট — সম্পূর্ণ রিপোর্ট',
+    `তৈরি হয়েছে: ${genDate}`,
+    '',
+    'সারসংক্ষেপ:',
+    `মোট খরচ: ${money(exp)}`,
+    `মোট জমা: ${money(rec)}`,
+    `হাতে ক্যাশ: ${money(cash)}`,
+    `প্রতি শেয়ার খরচ: ${money(psc)}`,
+    `সাপ্লায়ার বাকি: ${money(supDue)}`,
+    `লোন — আমরা দেব: ${money(loanPay)}`,
+    `লোন — আমরা পাব: ${money(loanRec)}`,
+    '',
+    'খাত অনুযায়ী খরচ:',
+    catLines || 'কোনো তথ্য নেই',
+    '',
+    'শেয়ারহোল্ডার তালিকা:',
+    shLines || 'কোনো তথ্য নেই',
+  ].join('\n');
+}
+
+/* ---------------- Standalone Shareholders Report (print / PDF) ---------------- */
+function shareholderReportHtml(){
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+  const psc = perShareCost();
+  const rows = [...STATE.shareholders].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const paid = shareholderPaid(p.name);
+    const shareOfCost = psc*Number(p.shares||0);
+    const due = shareOfCost - paid;
+    return `<tr><td>${esc(p.name)}</td><td>${esc(p.phone||'')}</td><td class="num">${p.shares}</td><td class="num">${money(shareOfCost)}</td><td class="num">${money(paid)}</td><td class="num">${due<=0?'অগ্রিম ':'বকেয়া '}${money(Math.abs(due))}</td></tr>`;
+  }).join('');
+  const totalPaid = STATE.shareholders.reduce((s,p)=>s+shareholderPaid(p.name),0);
+  return `
+    <div class="print-title" style="display:block;">
+      <h1>ড্রিম অ্যাপার্টমেন্ট — শেয়ারহোল্ডার রিপোর্ট</h1>
+      <div class="sub">তৈরি হয়েছে: ${genDate}</div>
+    </div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>নাম</th><th>মোবাইল</th><th class="num">শেয়ার</th><th class="num">প্রাপ্য অংশ</th><th class="num">জমা</th><th class="num">অবস্থা</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="4">মোট</td><td class="num">${money(totalPaid)}</td><td></td></tr></tfoot>
+      </table>
+    </div>
+  `;
+}
+
+/* ---------------- Shareholder Report: plain text (Email / WhatsApp) ---------------- */
+function shareholderReportSummaryText(){
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+  const psc = perShareCost();
+  const lines = [...STATE.shareholders].sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const paid = shareholderPaid(p.name);
+    const shareOfCost = psc*Number(p.shares||0);
+    const due = shareOfCost - paid;
+    return `• ${p.name} (শেয়ার ${p.shares}): প্রাপ্য অংশ ${money(shareOfCost)}, জমা ${money(paid)}, ${due<=0?'অগ্রিম':'বকেয়া'} ${money(Math.abs(due))}`;
+  }).join('\n');
+  const totalPaid = STATE.shareholders.reduce((s,p)=>s+shareholderPaid(p.name),0);
+  return [
+    'ড্রিম অ্যাপার্টমেন্ট — শেয়ারহোল্ডার রিপোর্ট',
+    `তৈরি হয়েছে: ${genDate}`,
+    '',
+    lines || 'কোনো তথ্য নেই',
+    '',
+    `মোট জমা: ${money(totalPaid)}`,
+  ].join('\n');
+}
+
+/* ---------------- Standalone Expense Report (print / PDF) ---------------- */
+function expenseReportHtml(){
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+  const rows = [...STATE.expenses].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(e=>{
+    const sup = e.supplierId ? STATE.suppliers.find(s=>s.id===e.supplierId) : null;
+    return `<tr><td>${fmtDate(e.date)}</td><td>${esc(e.voucher||'')}</td><td>${esc(e.category||'')}</td><td>${e.qty? e.qty+' '+esc(e.unit||''):'—'}</td><td>${esc(sup?sup.name:'—')}</td><td class="num">${money(e.total)}</td></tr>`;
+  }).join('');
+  const byCat = {};
+  STATE.expenses.forEach(e=>{
+    const c = e.category || 'অন্যান্য';
+    byCat[c] = (byCat[c]||0) + (Number(e.total)||0);
+  });
+  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>
+    `<tr><td>${esc(c)}</td><td class="num">${money(v)}</td></tr>`).join('');
+  return `
+    <div class="print-title" style="display:block;">
+      <h1>ড্রিম অ্যাপার্টমেন্ট — এক্সপেন্স রিপোর্ট</h1>
+      <div class="sub">তৈরি হয়েছে: ${genDate}</div>
+    </div>
+    <div class="report-section-title">খাত অনুযায়ী সারসংক্ষেপ</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>খাত</th><th class="num">পরিমাণ</th></tr></thead>
+        <tbody>${catRows || '<tr><td colspan="2" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="report-section-title">বিস্তারিত খরচের তালিকা</div>
+    <div class="card">
+      <table class="report-table">
+        <thead><tr><th>তারিখ</th><th>ভাউচার</th><th>খাত</th><th>পরিমাণ</th><th>সাপ্লায়ার</th><th class="num">টাকা</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" class="empty">কোনো তথ্য নেই</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="5">সর্বমোট</td><td class="num">${money(totalExpense())}</td></tr></tfoot>
+      </table>
+    </div>
+  `;
+}
+
+/* ---------------- Expense Report: plain text (Email / WhatsApp) ---------------- */
+function expenseReportSummaryText(){
+  const now = new Date();
+  const genDate = now.toISOString().slice(0,10) + ' ' + now.toTimeString().slice(0,5);
+  const byCat = {};
+  STATE.expenses.forEach(e=>{
+    const c = e.category || 'অন্যান্য';
+    byCat[c] = (byCat[c]||0) + (Number(e.total)||0);
+  });
+  const catLines = Object.entries(byCat).sort((a,b)=>b[1]-a[1])
+    .map(([c,v])=> `• ${c}: ${money(v)}`).join('\n');
+  return [
+    'ড্রিম অ্যাপার্টমেন্ট — এক্সপেন্স রিপোর্ট',
+    `তৈরি হয়েছে: ${genDate}`,
+    '',
+    'খাত অনুযায়ী সারসংক্ষেপ:',
+    catLines || 'কোনো তথ্য নেই',
+    '',
+    `সর্বমোট: ${money(totalExpense())}`,
+  ].join('\n');
+}
+
+function esc(s){
+  return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+/* ---------------- Delete handling (inline confirm) ---------------- */
+function attachListDeleteHandlers(){
+  document.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.onclick = (ev)=>{
+      const item = ev.target.closest('.list-item');
+      if(item.querySelector('.confirm-strip')) return;
+      const strip = document.createElement('div');
+      strip.className = 'confirm-strip';
+      strip.innerHTML = `<span>মুছে ফেলবেন?</span><button class="cancel">না</button><button class="yes">হ্যাঁ, মুছুন</button>`;
+      item.appendChild(strip);
+      strip.querySelector('.cancel').onclick = ()=> strip.remove();
+      strip.querySelector('.yes').onclick = async ()=>{
+        const type = item.dataset.type, id = item.dataset.id;
+        STATE[type] = STATE[type].filter(x=>x.id!==id);
+        await saveKey(type, STATE[type]);
+        showToast('মুছে ফেলা হয়েছে');
+        render();
+      };
+    };
+  });
+  document.querySelectorAll('.edit-btn').forEach(btn=>{
+    btn.onclick = (ev)=>{
+      const item = ev.target.closest('.list-item');
+      openForm(item.dataset.type, item.dataset.id);
+    };
+  });
+  document.querySelectorAll('.pay-btn').forEach(btn=>{
+    btn.onclick = (ev)=>{
+      const el = ev.target.closest('.pay-btn');
+      openPaymentForm(el.dataset.kind, el.dataset.id);
+    };
+  });
+  document.querySelectorAll('.print-btn').forEach(btn=>{
+    btn.onclick = (ev)=>{
+      const el = ev.target.closest('.print-btn');
+      const kind = el.dataset.kind, id = el.dataset.id;
+      if(kind==='deposit') printVoucher(receiveVoucherHtml(STATE.deposits.find(x=>x.id===id)));
+      else if(kind==='expense') printVoucher(expenseVoucherHtml(STATE.expenses.find(x=>x.id===id)));
+    };
+  });
+  document.querySelectorAll('.ledger-btn').forEach(btn=>{
+    btn.onclick = (ev)=>{
+      const el = ev.target.closest('.ledger-btn');
+      openLedgerModal(el.dataset.kind, el.dataset.id);
+    };
+  });
+}
+
+/* ---------------- Forms / Modal ---------------- */
+function closeModal(){ document.getElementById('modalBack').classList.remove('open'); }
+function openModal(){ document.getElementById('modalBack').classList.add('open'); }
+
+function openForm(type, id){
+  const isEdit = !!id;
+  let record = null;
+  if(isEdit) record = STATE[type].find(x=>x.id===id);
+  let html = '';
+  if(type==='deposits') html = depositFormHtml(record);
+  else if(type==='expenses') html = expenseFormHtml(record);
+  else if(type==='shareholders') html = shareholderFormHtml(record);
+  else if(type==='suppliers') html = supplierFormHtml(record);
+  else if(type==='loans') html = loanFormHtml(record);
+  document.getElementById('modalBody').innerHTML = html;
+  openModal();
+  wireFormSubmit(type, id);
+}
+
+function openPaymentForm(kind, id){
+  const html = kind==='supplier' ? supplierPaymentFormHtml(id) : loanPaymentFormHtml(id);
+  document.getElementById('modalBody').innerHTML = html;
+  openModal();
+  wirePaymentFormSubmit(kind, id);
+}
+
+/* ---------------- Ledger / history modals (with per-item voucher print) ---------------- */
+function openLedgerModal(kind, id){
+  let html = '';
+  if(kind==='supplier') html = supplierLedgerModalHtml(id);
+  else if(kind==='loan') html = loanLedgerModalHtml(id);
+  else if(kind==='shareholder') html = shareholderLedgerModalHtml(id);
+  document.getElementById('modalBody').innerHTML = html;
+  openModal();
+  const printAllBtn = document.getElementById('printLedgerBtn');
+  if(printAllBtn) printAllBtn.onclick = ()=>{
+    if(kind==='shareholder') printVoucher(shareholderLedgerReportHtml(id));
+  };
+  const emailBtn = document.getElementById('shareLedgerEmailBtn');
+  if(emailBtn) emailBtn.onclick = ()=>{
+    if(kind==='shareholder'){
+      const p = STATE.shareholders.find(x=>x.id===id);
+      const subject = 'শেয়ারহোল্ডার পার্সোনাল লেজার' + (p? ' — '+p.name : '');
+      sharePdfReport('email', shareholderLedgerReportHtml(id), 'পার্সোনাল-লেজার.pdf', subject, shareholderLedgerSummaryText(id));
+    }
+  };
+  const waBtn = document.getElementById('shareLedgerWaBtn');
+  if(waBtn) waBtn.onclick = ()=>{
+    if(kind==='shareholder'){
+      const p = STATE.shareholders.find(x=>x.id===id);
+      const subject = 'শেয়ারহোল্ডার পার্সোনাল লেজার' + (p? ' — '+p.name : '');
+      sharePdfReport('whatsapp', shareholderLedgerReportHtml(id), 'পার্সোনাল-লেজার.pdf', subject, shareholderLedgerSummaryText(id));
+    }
+  };
+  document.querySelectorAll('.voucher-print-row-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const k = btn.dataset.kind, pid = btn.dataset.id, entId = btn.dataset.entid;
+      if(k==='supplierPayment') printVoucher(paymentVoucherHtml('supplier', STATE.supplierPayments.find(x=>x.id===pid), entId));
+      else if(k==='loanPayment') printVoucher(paymentVoucherHtml('loan', STATE.loanPayments.find(x=>x.id===pid), entId));
+    };
+  });
+}
+
+function supplierLedgerModalHtml(supId){
+  const sup = STATE.suppliers.find(s=>s.id===supId);
+  const invoiced = supplierInvoiced(supId);
+  const paidAtPurchase = supplierPaidAtPurchase(supId);
+  const payments = STATE.supplierPayments.filter(p=>p.supplierId===supId).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const rows = payments.map(p=>`
+    <div class="list-item">
+      <div class="li-main"><div class="li-title">${fmtDate(p.date)}</div><div class="li-sub">${esc(p.notes||'')}</div></div>
+      <div class="li-amt num neg">${money(p.amount)}</div>
+      <div class="li-actions"><div class="icon-btn voucher-print-row-btn" data-kind="supplierPayment" data-id="${p.id}" data-entid="${supId}" title="পেমেন্ট ভাউচার প্রিন্ট">🖨</div></div>
+    </div>`).join('');
+  return `
+    <h3>${esc(sup?sup.name:'')} — লেনদেন ইতিহাস</h3>
+    <div class="li-sub" style="margin-bottom:10px;">মোট চালান ${money(invoiced)} · ক্রয়কালীন পরিশোধ ${money(paidAtPurchase)} · বর্তমান বাকি <b>${money(supplierDue(supId))}</b></div>
+    <div class="card" style="max-height:50vh; overflow-y:auto;">${rows || '<div class="empty">এখনো কোনো আলাদা পেমেন্ট রেকর্ড নেই</div>'}</div>
+    <div class="modal-actions"><button type="button" class="btn ghost" onclick="closeModal()">বন্ধ করুন</button></div>
+  `;
+}
+
+function loanLedgerModalHtml(loanId){
+  const loan = STATE.loans.find(l=>l.id===loanId);
+  const payments = STATE.loanPayments.filter(p=>p.loanId===loanId).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const rows = payments.map(p=>`
+    <div class="list-item">
+      <div class="li-main"><div class="li-title">${fmtDate(p.date)}</div><div class="li-sub">${esc(p.notes||'')}</div></div>
+      <div class="li-amt num">${money(p.amount)}</div>
+      <div class="li-actions"><div class="icon-btn voucher-print-row-btn" data-kind="loanPayment" data-id="${p.id}" data-entid="${loanId}" title="পেমেন্ট ভাউচার প্রিন্ট">🖨</div></div>
+    </div>`).join('');
+  return `
+    <h3>${esc(loan?loan.person:'')} — লেনদেন ইতিহাস</h3>
+    <div class="li-sub" style="margin-bottom:10px;">আসল ${money(loan?loan.principal:0)} · পরিশোধিত ${money(loanRepaid(loanId))} · বর্তমান স্থিতি <b>${money(loan?loanBalance(loan):0)}</b></div>
+    <div class="card" style="max-height:50vh; overflow-y:auto;">${rows || '<div class="empty">এখনো কোনো পরিশোধ রেকর্ড নেই</div>'}</div>
+    <div class="modal-actions"><button type="button" class="btn ghost" onclick="closeModal()">বন্ধ করুন</button></div>
+  `;
+}
+
+function shareholderLedgerModalHtml(shId){
+  const p = STATE.shareholders.find(x=>x.id===shId);
+  const deps = STATE.deposits.filter(d=>d.name===p.name).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const paid = shareholderPaid(p.name);
+  const dueAmt = perShareCost()*Number(p.shares||0) - paid;
+  const rows = deps.map(d=>`
+    <div class="list-item"><div class="li-main"><div class="li-title">${fmtDate(d.date)}</div><div class="li-sub">${esc(d.receipt||'')} ${d.method?'· '+esc(d.method):''}</div></div><div class="li-amt num pos">${money(d.amount)}</div></div>`).join('');
+  return `
+    <h3>${esc(p.name)} — পার্সোনাল লেজার</h3>
+    <div class="li-sub" style="margin-bottom:10px;">শেয়ার ${p.shares} · মোট জমা ${money(paid)} · ${dueAmt<=0?'অগ্রিম':'বকেয়া'} ${money(Math.abs(dueAmt))}</div>
+    <div class="card" style="max-height:44vh; overflow-y:auto;">${rows || '<div class="empty">কোনো জমা নেই</div>'}</div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" onclick="closeModal()">বন্ধ করুন</button>
+      <button type="button" class="btn primary" id="printLedgerBtn">🖨️ প্রিন্ট / PDF</button>
+    </div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button type="button" class="btn ghost" id="shareLedgerEmailBtn">✉️ ইমেইলে PDF পাঠান</button>
+      <button type="button" class="btn ghost" id="shareLedgerWaBtn">💬 হোয়াটসঅ্যাপে PDF পাঠান</button>
+    </div>
+  `;
+}
+
+function shareholderOptions(selected){
+  return STATE.shareholders.map(p=>`<option value="${esc(p.name)}" ${p.name===selected?'selected':''}>${esc(p.name)}</option>`).join('');
+}
+function categoryOptions(selected){
+  return STATE.categories.map(c=>`<option value="${esc(c.name)}" ${c.name===selected?'selected':''}>${esc(c.name)}</option>`).join('');
+}
+function nextReceiptNumber(){
+  let max = 0;
+  STATE.deposits.forEach(d=>{
+    const m = /^MR-(\d+)$/.exec((d.receipt||'').trim());
+    if(m) max = Math.max(max, parseInt(m[1],10));
+  });
+  return 'MR-' + (max+1);
+}
+function nextVoucherNumber(){
+  let max = 0;
+  STATE.expenses.forEach(e=>{
+    const m = /^EXP-(\d+)$/.exec((e.voucher||'').trim());
+    if(m) max = Math.max(max, parseInt(m[1],10));
+  });
+  return 'EXP-' + String(max+1).padStart(3,'0');
+}
+
+function depositFormHtml(r){
+  r = r || {date:new Date().toISOString().slice(0,10), name:'', receipt:nextReceiptNumber(), amount:'', method:'', notes:''};
+  return `
+    <h3>${r.id?'জমা এডিট করুন':'নতুন জমা এন্ট্রি'}</h3>
+    <form id="entityForm">
+      <div class="field-row">
+        <div class="field"><label>তারিখ</label><input type="date" name="date" value="${r.date||''}" required></div>
+        <div class="field"><label>রসিদ নং</label><input type="text" name="receipt" value="${esc(r.receipt)}" readonly></div>
+      </div>
+      <div class="field">
+        <label>শেয়ারহোল্ডারের নাম</label>
+        <select name="name" required>
+          <option value="">— নির্বাচন করুন —</option>
+          ${shareholderOptions(r.name)}
+        </select>
+      </div>
+      <div class="field"><label>জমার পরিমাণ (৳)</label><input type="number" step="any" name="amount" value="${r.amount??''}" required></div>
+      <div class="field">
+        <label>পেমেন্ট মাধ্যম</label>
+        <select name="method">
+          <option value="">— নির্বাচন করুন —</option>
+          <option ${r.method==='নগদ (Cash)'?'selected':''}>নগদ (Cash)</option>
+          <option ${r.method==='ব্যাংক ট্রান্সফার'?'selected':''}>ব্যাংক ট্রান্সফার</option>
+          <option ${r.method==='চেক'?'selected':''}>চেক</option>
+          <option ${r.method==='বিকাশ/নগদ (MFS)'?'selected':''}>বিকাশ/নগদ (MFS)</option>
+        </select>
+      </div>
+      <div class="field"><label>মন্তব্য</label><input type="text" name="notes" value="${esc(r.notes)}"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function supplierSelectOptions(selected){
+  return STATE.suppliers.map(s=>`<option value="${s.id}" ${s.id===selected?'selected':''}>${esc(s.name)}</option>`).join('');
+}
+
+function expenseFormHtml(r){
+  r = r || {date:new Date().toISOString().slice(0,10), voucher:nextVoucherNumber(), category:'', qty:'', unit:'', rate:'', total:'', approvedBy:'', notes:'', paymentType:'cash', supplierId:'', paidNow:''};
+  const isCredit = r.paymentType === 'credit' || !!r.supplierId;
+  return `
+    <h3>${r.id?'খরচ এডিট করুন':'নতুন খরচ এন্ট্রি'}</h3>
+    <form id="entityForm">
+      <div class="field-row">
+        <div class="field"><label>তারিখ</label><input type="date" name="date" value="${r.date||''}"></div>
+        <div class="field"><label>ভাউচার নং</label><input type="text" name="voucher" value="${esc(r.voucher)}" readonly></div>
+      </div>
+      <div class="field">
+        <label>খরচের খাত</label>
+        <select name="category" id="categoryInput" required>
+          <option value="">— নির্বাচন করুন —</option>
+          ${categoryOptions(r.category)}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>পরিমাণ (Qty)</label><input type="number" step="any" name="qty" value="${r.qty??''}" id="qtyInput"></div>
+        <div class="field"><label>একক</label><input type="text" name="unit" value="${esc(r.unit)}" placeholder="খাত অনুযায়ী স্বয়ংক্রিয়" id="unitInput" readonly></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>একক দর</label><input type="number" step="any" name="rate" value="${r.rate??''}" id="rateInput"></div>
+        <div class="field"><label>মোট টাকা</label><input type="number" step="any" name="total" value="${r.total??''}" id="totalInput"></div>
+      </div>
+      <div class="field">
+        <label>পরিশোধের ধরন</label>
+        <select name="paymentType" id="paymentTypeInput">
+          <option value="cash" ${!isCredit?'selected':''}>সম্পূর্ণ নগদ পরিশোধ</option>
+          <option value="credit" ${isCredit?'selected':''}>বাকি (সাপ্লায়ারের কাছে)</option>
+        </select>
+      </div>
+      <div id="creditFields" style="${isCredit?'':'display:none;'}">
+        <div class="field">
+          <label>সাপ্লায়ার</label>
+          <select name="supplierId">
+            <option value="">— নির্বাচন করুন —</option>
+            ${supplierSelectOptions(r.supplierId)}
+          </select>
+        </div>
+        <div class="field"><label>এখনই কত পরিশোধ করলেন (৳)</label><input type="number" step="any" name="paidNow" value="${r.paidNow??0}"></div>
+        ${STATE.suppliers.length===0? '<div class="li-sub" style="margin:-4px 0 10px;">এখনো কোনো সাপ্লায়ার যোগ করা হয়নি — "পাওনাদার" ট্যাবে গিয়ে আগে একজন যোগ করুন।</div>':''}
+      </div>
+      <div class="field"><label>অনুমোদনকারী</label><input type="text" name="approvedBy" value="${esc(r.approvedBy)}"></div>
+      <div class="field"><label>মন্তব্য</label><input type="text" name="notes" value="${esc(r.notes)}"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function supplierFormHtml(r){
+  r = r || {name:'', phone:'', notes:''};
+  return `
+    <h3>${r.id?'সাপ্লায়ার এডিট করুন':'নতুন পাওনাদার / সাপ্লায়ার'}</h3>
+    <form id="entityForm">
+      <div class="field"><label>নাম</label><input type="text" name="name" value="${esc(r.name)}" required></div>
+      <div class="field"><label>মোবাইল নম্বর</label><input type="tel" name="phone" value="${esc(r.phone)}"></div>
+      <div class="field"><label>মন্তব্য</label><input type="text" name="notes" value="${esc(r.notes)}" placeholder="যেমন: রড সাপ্লায়ার"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function supplierPaymentFormHtml(supplierId){
+  const sup = STATE.suppliers.find(s=>s.id===supplierId);
+  const due = supplierDue(supplierId);
+  return `
+    <h3>${esc(sup?sup.name:'')}-কে পেমেন্ট</h3>
+    <div class="li-sub" style="margin-bottom:12px;">বর্তমান বাকি: <b>${money(due)}</b></div>
+    <form id="entityForm">
+      <div class="field"><label>তারিখ</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div>
+      <div class="field"><label>পরিমাণ (৳)</label><input type="number" step="any" name="amount" required></div>
+      <div class="field"><label>মন্তব্য</label><input type="text" name="notes" placeholder="যেমন: নগদ পরিশোধ"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">পরিশোধ সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function loanFormHtml(r){
+  r = r || {type:'payable', person:'', phone:'', principal:'', date:new Date().toISOString().slice(0,10), notes:''};
+  return `
+    <h3>${r.id?'লোন হিসাব এডিট করুন':'নতুন লোন হিসাব'}</h3>
+    <form id="entityForm">
+      <div class="field">
+        <label>ধরন</label>
+        <select name="type">
+          <option value="payable" ${r.type==='payable'?'selected':''}>আমরা ধার নিয়েছি (আমরা দেব)</option>
+          <option value="receivable" ${r.type==='receivable'?'selected':''}>আমরা ধার দিয়েছি (আমরা পাব)</option>
+        </select>
+      </div>
+      <div class="field"><label>ব্যক্তি / প্রতিষ্ঠানের নাম</label><input type="text" name="person" value="${esc(r.person)}" required></div>
+      <div class="field"><label>মোবাইল নম্বর</label><input type="tel" name="phone" value="${esc(r.phone)}"></div>
+      <div class="field-row">
+        <div class="field"><label>মূল পরিমাণ (৳)</label><input type="number" step="any" name="principal" value="${r.principal??''}" required></div>
+        <div class="field"><label>তারিখ</label><input type="date" name="date" value="${r.date||''}"></div>
+      </div>
+      <div class="field"><label>মন্তব্য</label><input type="text" name="notes" value="${esc(r.notes)}"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function loanPaymentFormHtml(loanId){
+  const loan = STATE.loans.find(l=>l.id===loanId);
+  const bal = loan ? loanBalance(loan) : 0;
+  const label = loan && loan.type==='payable' ? 'পরিশোধ করছি' : 'ফেরত পাচ্ছি';
+  return `
+    <h3>${esc(loan?loan.person:'')} — ${label}</h3>
+    <div class="li-sub" style="margin-bottom:12px;">বর্তমান স্থিতি: <b>${money(bal)}</b></div>
+    <form id="entityForm">
+      <div class="field"><label>তারিখ</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div>
+      <div class="field"><label>পরিমাণ (৳)</label><input type="number" step="any" name="amount" required></div>
+      <div class="field"><label>মন্তব্য</label><input type="text" name="notes"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function shareholderFormHtml(r){
+  r = r || {name:'', phone:'', shares:''};
+  return `
+    <h3>${r.id?'শেয়ারহোল্ডার এডিট করুন':'নতুন শেয়ারহোল্ডার'}</h3>
+    <form id="entityForm">
+      <div class="field"><label>নাম</label><input type="text" name="name" value="${esc(r.name)}" required></div>
+      <div class="field"><label>মোবাইল নম্বর</label><input type="tel" name="phone" value="${esc(r.phone)}"></div>
+      <div class="field"><label>শেয়ার সংখ্যা</label><input type="number" step="any" name="shares" value="${r.shares??''}" required></div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" onclick="closeModal()">বাতিল</button>
+        <button type="submit" class="btn primary">সংরক্ষণ করুন</button>
+      </div>
+    </form>
+  `;
+}
+
+function wireFormSubmit(type, id){
+  const form = document.getElementById('entityForm');
+
+  // auto-calc total = qty * rate for expenses when both present
+  if(type==='expenses'){
+    const qtyEl = document.getElementById('qtyInput');
+    const rateEl = document.getElementById('rateInput');
+    const totalEl = document.getElementById('totalInput');
+    function recalc(){
+      const q = parseFloat(qtyEl.value), rt = parseFloat(rateEl.value);
+      if(!isNaN(q) && !isNaN(rt)) totalEl.value = (q*rt);
+    }
+    qtyEl.addEventListener('input', recalc);
+    rateEl.addEventListener('input', recalc);
+
+    // একক (unit) খাত অনুযায়ী স্বয়ংক্রিয়ভাবে নির্ধারিত হবে; অন্য খাতে কোনো একক থাকবে না
+    const categoryEl = document.getElementById('categoryInput');
+    const unitEl = document.getElementById('unitInput');
+    function syncUnit(){
+      const cat = STATE.categories.find(c=>c.name===categoryEl.value);
+      unitEl.value = (cat && cat.unit) ? cat.unit : '';
+    }
+    categoryEl.addEventListener('change', syncUnit);
+    syncUnit();
+
+    // toggle credit fields
+    const payTypeEl = document.getElementById('paymentTypeInput');
+    const creditFields = document.getElementById('creditFields');
+    payTypeEl.addEventListener('change', ()=>{
+      creditFields.style.display = payTypeEl.value==='credit' ? '' : 'none';
+    });
+  }
+
+  form.onsubmit = async (ev)=>{
+    ev.preventDefault();
+    const fd = new FormData(form);
+    const data = {};
+    fd.forEach((v,k)=>{ data[k]=v; });
+    ['amount','qty','rate','total','shares','principal','paidNow'].forEach(k=>{
+      if(k in data) data[k] = data[k]===''? '' : Number(data[k]);
+    });
+    // expenses: if cash payment, clear supplier linkage
+    if(type==='expenses'){
+      if(data.paymentType!=='credit'){ data.supplierId=''; data.paidNow=''; }
+    }
+    if(id){
+      const idx = STATE[type].findIndex(x=>x.id===id);
+      STATE[type][idx] = {...STATE[type][idx], ...data};
+    } else {
+      STATE[type].push({id: uid(), ...data});
+    }
+    await saveKey(type, STATE[type]);
+    closeModal();
+    showToast('সংরক্ষণ হয়েছে');
+    render();
+  };
+}
+
+function wirePaymentFormSubmit(kind, id){
+  const form = document.getElementById('entityForm');
+  const type = kind==='supplier' ? 'supplierPayments' : 'loanPayments';
+  const linkKey = kind==='supplier' ? 'supplierId' : 'loanId';
+  form.onsubmit = async (ev)=>{
+    ev.preventDefault();
+    const fd = new FormData(form);
+    const data = {};
+    fd.forEach((v,k)=>{ data[k]=v; });
+    data.amount = data.amount===''? 0 : Number(data.amount);
+    data[linkKey] = id;
+    STATE[type].push({id: uid(), ...data});
+    await saveKey(type, STATE[type]);
+    closeModal();
+    showToast('পেমেন্ট সংরক্ষণ হয়েছে');
+    render();
+  };
+}
+
+/* ---------------- Nav wiring ---------------- */
+document.querySelectorAll('.navbtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    CURRENT_TAB = btn.dataset.tab;
+    render();
+  });
+});
+document.getElementById('accountBtn').addEventListener('click', ()=>{ openAccountModal(); });
+document.getElementById('reportBtn').addEventListener('click', ()=>{
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+  CURRENT_TAB = 'report';
+  render();
+});
+document.getElementById('fabBtn').addEventListener('click', ()=>{
+  if(CURRENT_TAB==='dashboard'){ openForm('deposits', null); return; }
+  openForm(CURRENT_TAB, null);
+});
+// hide FAB on tabs where "add" happens via other actions is not needed here — every tab has a top-level add.
+document.getElementById('modalBack').addEventListener('click', (ev)=>{
+  if(ev.target.id==='modalBack') closeModal();
+});
+
+bootstrapApp();
+</script>
+</body>
+</html>
