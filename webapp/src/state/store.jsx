@@ -6,6 +6,7 @@ import {
 } from 'firebase/auth';
 import {
   doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, getDocs, serverTimestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { initFirebase, isFirebaseConfigured } from '../firebase.js';
 import { APP_KEYS, emptyState, seedCategories } from './calculations.js';
@@ -57,6 +58,10 @@ export function AppStateProvider({ children }) {
     return doc(dbRef.current, 'users', user.uid, 'app', 'state');
   }
 
+  // Returns the freshly-computed state (not just a flag) so callers that need
+  // to persist a just-seeded default (e.g. a brand-new user's categories)
+  // write that exact value instead of racing React's async setState via a
+  // stale stateRef.
   const applyState = useCallback((data) => {
     const isNew = !data;
     const next = {};
@@ -66,9 +71,11 @@ export function AppStateProvider({ children }) {
       else next[k] = [];
     });
     setState(next);
-    return isNew;
+    return { isNew, next };
   }, []);
 
+  // Full-document overwrite - only safe for cases with no concurrent writer:
+  // seeding a brand-new user's first document, or an explicit backup restore.
   const persistNow = useCallback(async (dataOverride) => {
     const user = authRef.current?.currentUser;
     if (!user || !dbRef.current) return false;
@@ -86,14 +93,38 @@ export function AppStateProvider({ children }) {
     }
   }, [setSyncState, showToast]);
 
+  // Merges ONE key against the latest server document inside a transaction,
+  // so a save from one tab/device never clobbers a different field that
+  // changed on another tab/device in between (each call only ever touches
+  // its own key, keeping everything else at whatever the server just had).
+  const persistKey = useCallback(async (key, val) => {
+    const user = authRef.current?.currentUser;
+    if (!user || !dbRef.current) return false;
+    setSyncState(navigator.onLine ? 'saving' : 'offline');
+    try {
+      const ref = stateDocRef(user);
+      await runTransaction(dbRef.current, async (tx) => {
+        const snap = await tx.get(ref);
+        const existing = (snap.exists() && snap.data().data) || {};
+        const merged = { ...existing, [key]: val };
+        tx.set(ref, { data: merged, email: user.email, updatedAt: serverTimestamp() }, { merge: true });
+      });
+      setSyncState('saved');
+      return true;
+    } catch (e) {
+      setSyncState('error');
+      showToast('সংরক্ষণ ব্যর্থ হয়েছে: ' + (e.message || 'error'));
+      return false;
+    }
+  }, [setSyncState, showToast]);
+
   // Keeps the same call signature used across every form: caller passes the
-  // already-updated array for one key, this saves the whole document.
+  // already-updated array for one key, this persists just that key.
   const saveKey = useCallback(async (key, val) => {
-    const next = { ...stateRef.current, [key]: val };
-    setState(next);
+    setState((prev) => ({ ...prev, [key]: val }));
     if (applyingRemoteRef.current) return true;
-    return persistNow(next);
-  }, [persistNow]);
+    return persistKey(key, val);
+  }, [persistKey]);
 
   function attachRealtimeListener(user) {
     if (unsubscribeRef.current) { try { unsubscribeRef.current(); } catch (e) {} }
@@ -105,16 +136,26 @@ export function AppStateProvider({ children }) {
     }, (err) => console.warn('Realtime listener error', err));
   }
 
-  const checkAccessAndLoad = useCallback(async (user) => {
+  // Returns 'ok' | 'denied' | 'error'. A real permission-denied means the
+  // account genuinely isn't allowlisted yet. Any other failure (offline on a
+  // brand-new device with no cached copy, a network blip) gets one retry
+  // before falling back, so a real connectivity hiccup doesn't get
+  // misreported as "still waiting for admin approval" to an already-approved
+  // user.
+  const checkAccessAndLoad = useCallback(async (user, attempt = 0) => {
     try {
       const snap = await getDoc(stateDocRef(user));
-      const isNew = applyState(snap.exists() ? snap.data().data : null);
+      const { isNew, next } = applyState(snap.exists() ? snap.data().data : null);
       attachRealtimeListener(user);
-      if (isNew) await persistNow(stateRef.current);
-      return true;
+      if (isNew) await persistNow(next);
+      return 'ok';
     } catch (e) {
       console.warn('Access check failed', e);
-      return false;
+      if (e.code !== 'permission-denied' && attempt < 1) {
+        await new Promise((r) => setTimeout(r, 1500));
+        return checkAccessAndLoad(user, attempt + 1);
+      }
+      return 'denied';
     }
   }, [applyState, persistNow]);
 
@@ -135,8 +176,8 @@ export function AppStateProvider({ children }) {
 
   const handleAuthenticatedUser = useCallback(async (user) => {
     setCurrentUser(user);
-    const ok = await checkAccessAndLoad(user);
-    if (ok) {
+    const result = await checkAccessAndLoad(user);
+    if (result === 'ok') {
       await checkIsAdmin(user);
       setScreen('app');
       return;
@@ -231,8 +272,8 @@ export function AppStateProvider({ children }) {
     const user = authRef.current?.currentUser;
     if (!user) return;
     showToast('চেক করা হচ্ছে…');
-    const ok = await checkAccessAndLoad(user);
-    if (ok) { await checkIsAdmin(user); setScreen('app'); }
+    const result = await checkAccessAndLoad(user);
+    if (result === 'ok') { await checkIsAdmin(user); setScreen('app'); }
     else showToast('এখনো অনুমোদন হয়নি');
   }, [checkAccessAndLoad, checkIsAdmin, showToast]);
 

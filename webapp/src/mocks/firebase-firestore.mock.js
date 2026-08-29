@@ -79,6 +79,14 @@ export function onSnapshot(ref, cb, errCb) {
   return () => {};
 }
 
+export async function runTransaction(db, updateFn) {
+  const tx = {
+    get: (ref) => getDoc(ref),
+    set: (ref, payload, opts) => setDoc(ref, payload, opts),
+  };
+  return updateFn(tx);
+}
+
 export async function getDocs(ref) {
   const { name } = ref;
   if ((name === 'pending' || name === 'allowlist') && !isAdminMock()) throw denyErr();
