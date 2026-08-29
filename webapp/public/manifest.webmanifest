@@ -1,0 +1,17 @@
+{
+  "name": "ড্রিম অ্যাপার্টমেন্ট — ফান্ড ট্র্যাকার",
+  "short_name": "ড্রিম অ্যাপার্টমেন্ট",
+  "description": "অ্যাপার্টমেন্ট প্রকল্পের ফান্ড, খরচ ও শেয়ারহোল্ডার ট্র্যাকার",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EFEDE8",
+  "theme_color": "#16233E",
+  "lang": "bn",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
