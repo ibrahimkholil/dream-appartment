@@ -24,14 +24,15 @@ export function collection(db, name) {
 
 export async function getDoc(ref) {
   if (ref.kind === 'state') {
-    if (!mockFirebase.user || !isAllowedMock(mockFirebase.user.email)) throw denyErr();
+    if (!mockFirebase.user || !(isAllowedMock(mockFirebase.user.email) || isAdminMock())) throw denyErr();
     return mockFirebase.docData
       ? { exists: () => true, data: () => ({ data: mockFirebase.docData }) }
       : { exists: () => false, data: () => undefined };
   }
   const { collName, id } = ref;
   if (collName === 'admins') {
-    if (!mockFirebase.user || mockFirebase.user.email.toLowerCase() !== id) throw denyErr();
+    const isSelf = mockFirebase.user && mockFirebase.user.email.toLowerCase() === id;
+    if (!isSelf && !isAdminMock()) throw denyErr();
   } else if (collName === 'allowlist') {
     if (!isAdminMock()) throw denyErr();
   } else if (collName === 'pending') {
@@ -44,13 +45,14 @@ export async function getDoc(ref) {
 
 export async function setDoc(ref, payload, opts) {
   if (ref.kind === 'state') {
-    if (!mockFirebase.user || !isAllowedMock(mockFirebase.user.email)) throw denyErr();
+    if (!mockFirebase.user || !(isAllowedMock(mockFirebase.user.email) || isAdminMock())) throw denyErr();
     mockFirebase.docData = payload.data;
     return;
   }
   const { collName, id } = ref;
-  if (collName === 'admins') throw denyErr();
-  if (collName === 'allowlist') {
+  if (collName === 'admins') {
+    if (!isAdminMock()) throw denyErr();
+  } else if (collName === 'allowlist') {
     if (!isAdminMock()) throw denyErr();
   } else if (collName === 'pending') {
     const isOwn = mockFirebase.user && mockFirebase.user.uid === id;
@@ -63,8 +65,7 @@ export async function setDoc(ref, payload, opts) {
 
 export async function deleteDoc(ref) {
   const { collName, id } = ref;
-  if (collName === 'admins') throw denyErr();
-  if ((collName === 'allowlist' || collName === 'pending') && !isAdminMock()) throw denyErr();
+  if ((collName === 'admins' || collName === 'allowlist' || collName === 'pending') && !isAdminMock()) throw denyErr();
   delete mockFirebase.collections[collName]?.[id];
 }
 
@@ -89,7 +90,7 @@ export async function runTransaction(db, updateFn) {
 
 export async function getDocs(ref) {
   const { name } = ref;
-  if ((name === 'pending' || name === 'allowlist') && !isAdminMock()) throw denyErr();
+  if ((name === 'pending' || name === 'allowlist' || name === 'admins') && !isAdminMock()) throw denyErr();
   const store = mockFirebase.collections[name] || {};
   const docs = Object.keys(store).map((id) => ({ id, data: () => store[id] }));
   return { forEach: (fn) => docs.forEach(fn), docs };

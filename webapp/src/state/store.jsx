@@ -295,15 +295,18 @@ export function AppStateProvider({ children }) {
 
   // ---------------- Admin actions ----------------
   const fetchAdminData = useCallback(async () => {
-    const [pendingSnap, allowSnap] = await Promise.all([
+    const [pendingSnap, allowSnap, adminSnap] = await Promise.all([
       getDocs(collection(dbRef.current, 'pending')),
       getDocs(collection(dbRef.current, 'allowlist')),
+      getDocs(collection(dbRef.current, 'admins')),
     ]);
     const pending = [];
     pendingSnap.forEach((d) => pending.push({ uid: d.id, ...d.data() }));
     const allowed = [];
     allowSnap.forEach((d) => allowed.push(d.id));
-    return { pending, allowed };
+    const admins = [];
+    adminSnap.forEach((d) => admins.push(d.id));
+    return { pending, allowed, admins };
   }, []);
 
   const approvePending = useCallback(async (uidVal, email) => {
@@ -321,6 +324,16 @@ export function AppStateProvider({ children }) {
     await deleteDoc(doc(dbRef.current, 'allowlist', email.toLowerCase()));
   }, []);
 
+  const addAdmin = useCallback(async (email) => {
+    await setDoc(doc(dbRef.current, 'admins', email.toLowerCase()), {
+      admin: true, addedAt: serverTimestamp(), addedBy: currentUser?.email,
+    });
+  }, [currentUser]);
+
+  const removeAdmin = useCallback(async (email) => {
+    await deleteDoc(doc(dbRef.current, 'admins', email.toLowerCase()));
+  }, []);
+
   const value = {
     screen, setScreen,
     authMsg, setAuthMsg, authMode, setAuthMode, submitAuth, forgotPassword,
@@ -331,7 +344,7 @@ export function AppStateProvider({ children }) {
     syncState,
     toast, showToast,
     modalContent, openModal, closeModal,
-    fetchAdminData, approvePending, rejectPending, revokeAccess,
+    fetchAdminData, approvePending, rejectPending, revokeAccess, addAdmin, removeAdmin,
     firestore: () => dbRef.current,
   };
 

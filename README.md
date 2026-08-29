@@ -94,18 +94,28 @@ existing users to verify their email.
 
 ### Making yourself an admin (in-app approval panel)
 
-Instead of doing step 3 above by hand in the console every time, an admin
-can approve/reject requests and manage the allowlist right inside the app
-via the 🛡️ button in the header (only visible to admins). To make an
-account an admin:
+An admin can approve/reject signup requests, manage the allowlist, and
+add/remove other admins right inside the app via the 🛡️ button in the
+header (only visible to admins) — no Firestore Console needed for any of
+that. Admins also get full app access automatically, even without a
+separate allowlist entry.
+
+**The one Console step you can't skip**: the very first admin has to be
+created manually, once — otherwise anyone could grant themselves admin
+from inside the app, which would defeat the point of having admins at all.
+Every system with permission levels has this same bootstrapping step
+somewhere; here it's just one Firestore document:
 
 1. In Firestore Database, click **Start collection**.
 2. Collection ID: `admins`
-3. Document ID: that person's email, all lowercase (same format as
-   `allowlist`). Any single field works, e.g. `admin: true`.
-4. Repeat for each admin. There's no in-app way to promote/demote admins —
-   that's deliberately Console-only, so a compromised account can't grant
-   itself or others more access.
+3. Document ID: your email, all lowercase (same format as `allowlist`).
+   Any single field works, e.g. `admin: true`.
+4. Log out and back into the app with that email — the 🛡️ button appears.
+
+After that, you never need the Console for admin management again: open
+🛡️ → **অ্যাডমিন তালিকা** (admin list) → type an email → **+ যোগ করুন** to
+add another admin, or tap 🗑 next to one to remove them (you can't remove
+the last remaining admin, to avoid locking everyone out).
 
 ## 6. Deploy the security rules
 

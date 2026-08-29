@@ -7,15 +7,17 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
     }
 
-    // Admins. Bootstrapped manually via the Firebase Console (Firestore ->
-    // admins collection, document ID = lower-cased email). A user may check
-    // ONLY their own admin doc (to decide whether to show the admin panel);
-    // nobody can list the full admin roster or write to it from the app -
-    // promoting/demoting admins is a deliberate Console-only action.
+    // Admins. The very FIRST admin is bootstrapped manually via the Firebase
+    // Console (Firestore -> admins collection, document ID = lower-cased
+    // email) - a deliberate one-time step so nobody can grant themselves
+    // admin from inside the app. After that, existing admins can add/remove
+    // other admins from the in-app admin panel. A non-admin may still check
+    // ONLY their own admin doc (to decide whether to show the panel at all).
     match /admins/{emailId} {
-      allow read: if request.auth != null && request.auth.token.email != null
-        && request.auth.token.email.lower() == emailId;
-      allow write: if false;
+      allow read: if isAdmin() || (request.auth != null && request.auth.token.email != null
+        && request.auth.token.email.lower() == emailId);
+      allow create, delete: if isAdmin();
+      allow update: if false;
     }
 
     // Access allowlist. Admins can read/manage it from the in-app admin
@@ -37,11 +39,15 @@ service cloud.firestore {
     }
 
     // Each signed-in, allowlisted user gets their own private app state.
+    // Admins always get in too (even without a separate allowlist entry) -
+    // otherwise adding someone as admin wouldn't let them actually reach the
+    // app to use their admin powers.
     match /users/{uid}/app/{document=**} {
       allow read, write: if request.auth != null
         && request.auth.uid == uid
         && request.auth.token.email != null
-        && exists(/databases/$(database)/documents/allowlist/$(request.auth.token.email.lower()));
+        && (exists(/databases/$(database)/documents/allowlist/$(request.auth.token.email.lower()))
+            || isAdmin());
     }
 
     // Deny everything else by default.
