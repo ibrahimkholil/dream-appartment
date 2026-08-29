@@ -2,17 +2,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAdmin() {
+    // Permanent owner emails, baked directly into the rules so the very
+    // first admin never needs a manually-created Firestore document - only
+    // this one rules deploy. Add more addresses here (comma-separated,
+    // lowercase) if you want more than one permanent owner; everyone else
+    // is promoted to admin from the in-app panel instead, stored normally
+    // in the admins collection below.
+    function isOwner() {
       return request.auth != null && request.auth.token.email != null
-        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
+        && request.auth.token.email.lower() in
+           ['ibrahimkhalil123@gmail.com', 'dreamapt@gmail.com'];
     }
 
-    // Admins. The very FIRST admin is bootstrapped manually via the Firebase
-    // Console (Firestore -> admins collection, document ID = lower-cased
-    // email) - a deliberate one-time step so nobody can grant themselves
-    // admin from inside the app. After that, existing admins can add/remove
-    // other admins from the in-app admin panel. A non-admin may still check
-    // ONLY their own admin doc (to decide whether to show the panel at all).
+    function isAdmin() {
+      return isOwner() || (request.auth != null && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())));
+    }
+
+    // Admins beyond the permanent owners above are managed entirely from the
+    // in-app admin panel (any existing admin, owner or not, can add/remove
+    // others there). A non-admin may still check ONLY their own admin doc
+    // (to decide whether to show the panel at all).
     match /admins/{emailId} {
       allow read: if isAdmin() || (request.auth != null && request.auth.token.email != null
         && request.auth.token.email.lower() == emailId);

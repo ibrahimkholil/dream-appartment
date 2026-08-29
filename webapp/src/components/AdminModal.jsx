@@ -7,7 +7,7 @@ function fmtTimestamp(ts) {
 }
 
 export function AdminModal({ onClose }) {
-  const { fetchAdminData, approvePending, rejectPending, revokeAccess, addAdmin, removeAdmin, currentUser, showToast } = useAppState();
+  const { fetchAdminData, approvePending, rejectPending, revokeAccess, addAdmin, removeAdmin, currentUser, showToast, ownerEmails } = useAppState();
   const [pending, setPending] = useState(null);
   const [allowed, setAllowed] = useState(null);
   const [admins, setAdmins] = useState(null);
@@ -52,7 +52,7 @@ export function AdminModal({ onClose }) {
     } catch (e) { showToast('ব্যর্থ: ' + (e.message || '')); }
   }
   async function onRemoveAdmin(email) {
-    if (admins && admins.length <= 1) { showToast('শেষ অ্যাডমিন বাতিল করা যাবে না'); return; }
+    if (ownerEmails?.includes(email)) { showToast('এটি একটি স্থায়ী মালিক অ্যাকাউন্ট, বাতিল করা যাবে না'); return; }
     const isSelf = currentUser?.email?.toLowerCase() === email;
     const msg = isSelf
       ? 'আপনি নিজেই অ্যাডমিন তালিকা থেকে বের হয়ে যাবেন এবং আর এই প্যানেল দেখতে পাবেন না। নিশ্চিত?'
@@ -109,12 +109,20 @@ export function AdminModal({ onClose }) {
         {loadError ? <div className="empty">লোড ব্যর্থ</div>
           : admins === null ? <div className="empty">লোড হচ্ছে…</div>
           : admins.length === 0 ? <div className="empty">কোনো অ্যাডমিন নেই</div>
-          : admins.map((email) => (
-            <div className="list-item" key={email}>
-              <div className="li-main"><div className="li-title">{email}{currentUser?.email?.toLowerCase() === email ? ' (আপনি)' : ''}</div></div>
-              <div className="li-actions"><div className="icon-btn danger" title="অ্যাডমিন বাতিল করুন" onClick={() => onRemoveAdmin(email)}>🗑</div></div>
-            </div>
-          ))}
+          : admins.map((email) => {
+            const isOwnerEmail = ownerEmails?.includes(email);
+            return (
+              <div className="list-item" key={email}>
+                <div className="li-main">
+                  <div className="li-title">{email}{currentUser?.email?.toLowerCase() === email ? ' (আপনি)' : ''}</div>
+                  {isOwnerEmail && <div className="li-sub">স্থায়ী মালিক — বাতিল করা যাবে না</div>}
+                </div>
+                {!isOwnerEmail && (
+                  <div className="li-actions"><div className="icon-btn danger" title="অ্যাডমিন বাতিল করুন" onClick={() => onRemoveAdmin(email)}>🗑</div></div>
+                )}
+              </div>
+            );
+          })}
         <p className="muted" style={{ padding: '8px 4px 2px' }}>অ্যাডমিন যোগ করলে তিনি সরাসরি অ্যাপে ঢুকতে পারবেন এবং এই প্যানেল দেখতে পাবেন — আলাদাভাবে "অনুমোদিত ইমেইল তালিকা"-তে যোগ করার দরকার নেই।</p>
       </div>
 

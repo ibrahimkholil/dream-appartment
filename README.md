@@ -100,22 +100,27 @@ header (only visible to admins) — no Firestore Console needed for any of
 that. Admins also get full app access automatically, even without a
 separate allowlist entry.
 
-**The one Console step you can't skip**: the very first admin has to be
-created manually, once — otherwise anyone could grant themselves admin
-from inside the app, which would defeat the point of having admins at all.
-Every system with permission levels has this same bootstrapping step
-somewhere; here it's just one Firestore document:
+**The one step you can't skip**: the very first admin has to be established
+outside the app itself — otherwise anyone could grant themselves admin from
+inside it, which would defeat the point of having admins at all. Every
+system with permission levels has this same bootstrapping step somewhere.
+Here it's baked directly into `firestore.rules` as a short list of "owner"
+emails (see the `isOwner()` function near the top) — no Firestore document
+to create by hand. To set your own owner email(s):
 
-1. In Firestore Database, click **Start collection**.
-2. Collection ID: `admins`
-3. Document ID: your email, all lowercase (same format as `allowlist`).
-   Any single field works, e.g. `admin: true`.
-4. Log out and back into the app with that email — the 🛡️ button appears.
+1. Open `firestore.rules`, find the `isOwner()` function, and edit the
+   email list to your own address(es).
+2. Publish the updated rules (see step 6 below — paste the file's contents
+   into Firestore Database → **Rules** → Publish).
+3. Log out and back into the app with that email — the 🛡️ button appears,
+   with your owner email(s) already listed and marked "স্থায়ী মালিক"
+   (permanent owner, can't be removed from the panel).
 
 After that, you never need the Console for admin management again: open
 🛡️ → **অ্যাডমিন তালিকা** (admin list) → type an email → **+ যোগ করুন** to
-add another admin, or tap 🗑 next to one to remove them (you can't remove
-the last remaining admin, to avoid locking everyone out).
+add another (regular) admin, or tap 🗑 next to one to remove them. Owners
+stay permanent by design — if you ever want to change who they are, that's
+another one-line edit to `isOwner()` and a rules republish.
 
 ## 6. Deploy the security rules
 

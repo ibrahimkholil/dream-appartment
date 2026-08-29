@@ -11,6 +11,12 @@ import {
 import { initFirebase, isFirebaseConfigured } from '../firebase.js';
 import { APP_KEYS, emptyState, seedCategories } from './calculations.js';
 
+// Permanent owner emails - mirrors firestore.rules' isOwner(). These always
+// count as admin, without needing an admins/{email} Firestore document, so
+// the very first admin only ever requires one rules deploy, not a manually
+// created document too. Keep this list in sync with firestore.rules.
+const OWNER_EMAILS = ['ibrahimkhalil123@gmail.com', 'dreamapt@gmail.com'];
+
 const AppStateContext = createContext(null);
 export function useAppState() {
   return useContext(AppStateContext);
@@ -168,8 +174,10 @@ export function AppStateProvider({ children }) {
 
   const checkIsAdmin = useCallback(async (user) => {
     if (!user?.email || !dbRef.current) { setIsAdmin(false); return; }
+    const email = user.email.toLowerCase();
+    if (OWNER_EMAILS.includes(email)) { setIsAdmin(true); return; }
     try {
-      const snap = await getDoc(doc(dbRef.current, 'admins', user.email.toLowerCase()));
+      const snap = await getDoc(doc(dbRef.current, 'admins', email));
       setIsAdmin(!!snap.exists());
     } catch (e) { setIsAdmin(false); }
   }, []);
@@ -304,9 +312,9 @@ export function AppStateProvider({ children }) {
     pendingSnap.forEach((d) => pending.push({ uid: d.id, ...d.data() }));
     const allowed = [];
     allowSnap.forEach((d) => allowed.push(d.id));
-    const admins = [];
-    adminSnap.forEach((d) => admins.push(d.id));
-    return { pending, allowed, admins };
+    const admins = new Set(OWNER_EMAILS);
+    adminSnap.forEach((d) => admins.add(d.id));
+    return { pending, allowed, admins: Array.from(admins) };
   }, []);
 
   const approvePending = useCallback(async (uidVal, email) => {
@@ -345,6 +353,7 @@ export function AppStateProvider({ children }) {
     toast, showToast,
     modalContent, openModal, closeModal,
     fetchAdminData, approvePending, rejectPending, revokeAccess, addAdmin, removeAdmin,
+    ownerEmails: OWNER_EMAILS,
     firestore: () => dbRef.current,
   };
 
