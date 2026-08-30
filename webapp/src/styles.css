@@ -340,3 +340,49 @@
   .bar-row .bar-row-top{ display:flex; justify-content:space-between; font-size:13.5px; margin-bottom:5px; }
   .bar-track{ height:8px; background:var(--concrete-2); border-radius:4px; overflow:hidden; }
   .bar-fill{ height:100%; background:var(--brick); border-radius:4px; transition:width .5s cubic-bezier(.22,1,.36,1); }
+
+  /* Desktop layout: a fixed left sidebar for navigation and a wider content
+     column, instead of the mobile single-column shell with a bottom tab bar.
+     Everything below this breakpoint (phones/small tablets) is untouched. */
+  @media (min-width:900px){
+    #app{
+      max-width:none;
+      display:grid;
+      grid-template-columns:240px 1fr;
+      grid-template-rows:auto 1fr;
+    }
+    header.top{
+      grid-column:2; grid-row:1;
+      border-radius:0 0 18px 18px;
+      padding:20px 40px 26px;
+    }
+    header.top .brand-title{ font-size:22px; }
+    header.top .brand-sub{ font-size:12.5px; }
+    main{
+      grid-column:2; grid-row:2;
+      max-width:1100px; width:100%; margin:0 auto;
+      padding:28px 40px 56px;
+    }
+    nav.bottom{
+      grid-column:1; grid-row:1/-1;
+      position:sticky; top:0; align-self:start; height:100vh;
+      left:auto; transform:none; width:100%; max-width:none;
+      flex-direction:column; align-items:stretch; justify-content:flex-start;
+      gap:2px; padding:22px 12px; border-top:none; border-right:1px solid var(--line);
+      box-shadow:none;
+    }
+    nav.bottom button{
+      flex-direction:row; justify-content:flex-start; gap:11px;
+      padding:11px 14px; border-radius:10px; font-size:13.5px;
+    }
+    nav.bottom button .ic{ font-size:18px; }
+    nav.bottom button.active{ background:var(--concrete); }
+    .fab{ right:36px; bottom:36px; }
+    .stat-grid{ grid-template-columns:repeat(4,1fr); }
+    .modal-back{ align-items:center; }
+    .modal{ max-width:520px; border-radius:20px; max-height:85vh; }
+  }
+  @media (min-width:900px) and (hover:hover){
+    .card{ transition:box-shadow .15s ease; }
+    .card:hover{ box-shadow:0 4px 14px rgba(22,35,62,.10); }
+  }
