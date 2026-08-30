@@ -1,9 +1,10 @@
 import React from 'react';
 import { useAppState } from './state/store.jsx';
 import { BootScreen, SetupScreen, AuthScreen, VerifyScreen, PendingScreen } from './components/Screens.jsx';
-import { Header, BottomNav, Fab, ModalHost, ToastHost } from './components/Layout.jsx';
+import { Header, BottomNav, Fab, ModalHost, ToastHost, NoProjectNotice } from './components/Layout.jsx';
 import { AccountModal } from './components/AccountModal.jsx';
 import { AdminModal } from './components/AdminModal.jsx';
+import { ProjectsModal } from './components/ProjectsModal.jsx';
 import { DepositForm, ExpenseForm, SupplierForm, LoanForm, ShareholderForm } from './components/Forms.jsx';
 import Dashboard from './components/tabs/Dashboard.jsx';
 import Deposits from './components/tabs/Deposits.jsx';
@@ -32,8 +33,9 @@ const TAB_FORMS = {
 };
 
 function AppShell() {
-  const { tab, setTab, openModal, closeModal } = useAppState();
+  const { tab, setTab, state, openModal, closeModal } = useAppState();
   const TabComponent = TAB_COMPONENTS[tab] || Dashboard;
+  const noProjects = state.projects.length === 0;
 
   function handleFab() {
     const formTab = tab === 'dashboard' ? 'deposits' : tab;
@@ -42,17 +44,20 @@ function AppShell() {
     openModal(<FormComponent record={null} onClose={closeModal} />);
   }
 
+  function openProjects() { openModal(<ProjectsModal onClose={closeModal} />); }
+
   return (
     <div id="app" className="fade-in">
       <Header
         onOpenAdmin={() => openModal(<AdminModal onClose={closeModal} />)}
         onOpenReport={() => setTab('report')}
         onOpenAccount={() => openModal(<AccountModal onClose={closeModal} />)}
+        onOpenProjects={openProjects}
       />
       <main>
-        <TabComponent />
+        {noProjects ? <NoProjectNotice onCreate={openProjects} /> : <TabComponent />}
       </main>
-      <Fab onClick={handleFab} hidden={tab === 'report'} />
+      <Fab onClick={handleFab} hidden={tab === 'report' || noProjects} />
       <BottomNav />
     </div>
   );

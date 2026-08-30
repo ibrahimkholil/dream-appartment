@@ -7,8 +7,8 @@ import { expenseVoucherHtml } from '../../lib/vouchers.js';
 import { printVoucher } from '../../lib/pdf.js';
 
 export default function Expenses() {
-  const { state, saveKey, showToast, openModal, closeModal } = useAppState();
-  const rows = [...state.expenses].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const { state, scopedState, saveKey, showToast, openModal, closeModal } = useAppState();
+  const rows = [...scopedState.expenses].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   function openEdit(e) { openModal(<ExpenseForm record={e} onClose={closeModal} />); }
   async function del(id) {
@@ -18,10 +18,10 @@ export default function Expenses() {
 
   return (
     <>
-      <div className="section-title">খরচের তালিকা <span className="tag">{state.expenses.length} এন্ট্রি</span></div>
+      <div className="section-title">খরচের তালিকা <span className="tag">{scopedState.expenses.length} এন্ট্রি</span></div>
       <div className="card">
         {rows.length ? rows.map((e) => {
-          const sup = e.supplierId ? state.suppliers.find((s) => s.id === e.supplierId) : null;
+          const sup = e.supplierId ? scopedState.suppliers.find((s) => s.id === e.supplierId) : null;
           const due = sup ? (Number(e.total) || 0) - (Number(e.paidNow) || 0) : 0;
           return (
             <div className="list-item" key={e.id}>
@@ -32,7 +32,7 @@ export default function Expenses() {
               </div>
               <div className="li-amt num neg">{money(e.total)}</div>
               <RowActions onDelete={() => del(e.id)}>
-                <div className="icon-btn" title="খরচের ভাউচার প্রিন্ট" onClick={() => printVoucher(expenseVoucherHtml(e, state))}>🖨</div>
+                <div className="icon-btn" title="খরচের ভাউচার প্রিন্ট" onClick={() => printVoucher(expenseVoucherHtml(e, scopedState))}>🖨</div>
                 <div className="icon-btn" onClick={() => openEdit(e)}>✎</div>
               </RowActions>
             </div>

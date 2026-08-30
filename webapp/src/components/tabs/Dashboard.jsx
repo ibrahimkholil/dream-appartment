@@ -25,7 +25,7 @@ function ExpenseByCategoryChart({ rows }) {
 }
 
 export default function Dashboard() {
-  const { state } = useAppState();
+  const { scopedState: state } = useAppState();
   const exp = totalExpense(state), rec = totalReceived(state), cash = cashInHand(state), psc = perShareCost(state);
   const supDue = totalSupplierDue(state), loanPay = totalLoanPayable(state), loanRec = totalLoanReceivable(state);
 

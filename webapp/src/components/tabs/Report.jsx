@@ -7,7 +7,7 @@ import {
 import { printVoucher, sharePdfReport } from '../../lib/pdf.js';
 
 export default function Report() {
-  const { state, showToast } = useAppState();
+  const { scopedState: state, showToast } = useAppState();
 
   return (
     <>

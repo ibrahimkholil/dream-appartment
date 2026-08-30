@@ -6,8 +6,8 @@ import { SupplierForm, PaymentForm } from '../Forms.jsx';
 import { SupplierLedgerModal } from '../LedgerModal.jsx';
 
 export default function Suppliers() {
-  const { state, saveKey, showToast, openModal, closeModal } = useAppState();
-  const rows = [...state.suppliers].sort((a, b) => supplierDue(state, b.id) - supplierDue(state, a.id));
+  const { state, scopedState, saveKey, showToast, openModal, closeModal } = useAppState();
+  const rows = [...scopedState.suppliers].sort((a, b) => supplierDue(scopedState, b.id) - supplierDue(scopedState, a.id));
 
   function openEdit(s) { openModal(<SupplierForm record={s} onClose={closeModal} />); }
   function openPay(id) { openModal(<PaymentForm kind="supplier" entityId={id} onClose={closeModal} />); }
@@ -19,12 +19,12 @@ export default function Suppliers() {
 
   return (
     <>
-      <div className="section-title">পাওনাদার / সাপ্লায়ার <span className="tag">{state.suppliers.length} জন</span></div>
+      <div className="section-title">পাওনাদার / সাপ্লায়ার <span className="tag">{scopedState.suppliers.length} জন</span></div>
       <div className="card">
         {rows.length ? rows.map((s) => {
-          const invoiced = supplierInvoiced(state, s.id);
-          const paid = supplierPaidAtPurchase(state, s.id) + supplierPaymentsTotal(state, s.id);
-          const due = supplierDue(state, s.id);
+          const invoiced = supplierInvoiced(scopedState, s.id);
+          const paid = supplierPaidAtPurchase(scopedState, s.id) + supplierPaymentsTotal(scopedState, s.id);
+          const due = supplierDue(scopedState, s.id);
           return (
             <div className="list-item" key={s.id}>
               <div className="li-main">

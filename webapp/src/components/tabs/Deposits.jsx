@@ -7,8 +7,8 @@ import { receiveVoucherHtml } from '../../lib/vouchers.js';
 import { printVoucher } from '../../lib/pdf.js';
 
 export default function Deposits() {
-  const { state, saveKey, showToast, openModal, closeModal } = useAppState();
-  const rows = [...state.deposits].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const { state, scopedState, saveKey, showToast, openModal, closeModal } = useAppState();
+  const rows = [...scopedState.deposits].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   function openEdit(d) { openModal(<DepositForm record={d} onClose={closeModal} />); }
   async function del(id) {
@@ -18,7 +18,7 @@ export default function Deposits() {
 
   return (
     <>
-      <div className="section-title">জমার তালিকা <span className="tag">{state.deposits.length} এন্ট্রি</span></div>
+      <div className="section-title">জমার তালিকা <span className="tag">{scopedState.deposits.length} এন্ট্রি</span></div>
       <div className="card">
         {rows.length ? rows.map((d) => (
           <div className="list-item" key={d.id}>

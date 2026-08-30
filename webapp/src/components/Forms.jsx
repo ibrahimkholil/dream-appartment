@@ -21,27 +21,27 @@ function FormShell({ title, onCancel, onSubmit, children }) {
   );
 }
 
-async function saveEntity(saveKey, state, type, id, data) {
+async function saveEntity(saveKey, state, type, id, data, projectId) {
   const list = state[type].slice();
   if (id) {
     const idx = list.findIndex((x) => x.id === id);
     list[idx] = { ...list[idx], ...data };
   } else {
-    list.push({ id: uid(), ...data });
+    list.push({ id: uid(), projectId, ...data });
   }
   await saveKey(type, list);
 }
 
 export function DepositForm({ record, onClose }) {
-  const { state, saveKey, showToast } = useAppState();
-  const r = record || { date: todayISO(), name: '', receipt: nextReceiptNumber(state), amount: '', method: '', notes: '' };
+  const { state, scopedState, currentProjectId, saveKey, showToast } = useAppState();
+  const r = record || { date: todayISO(), name: '', receipt: nextReceiptNumber(scopedState), amount: '', method: '', notes: '' };
   const [form, setForm] = useState(r);
 
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
   async function onSubmit(ev) {
     ev.preventDefault();
-    await saveEntity(saveKey, state, 'deposits', record?.id, { ...form, amount: Number(form.amount) || 0 });
+    await saveEntity(saveKey, state, 'deposits', record?.id, { ...form, amount: Number(form.amount) || 0 }, currentProjectId);
     showToast('সংরক্ষণ হয়েছে');
     onClose();
   }
@@ -56,7 +56,7 @@ export function DepositForm({ record, onClose }) {
         <label>শেয়ারহোল্ডারের নাম</label>
         <select required value={form.name || ''} onChange={(e) => set('name', e.target.value)}>
           <option value="">— নির্বাচন করুন —</option>
-          {state.shareholders.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+          {scopedState.shareholders.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
         </select>
       </div>
       <div className="field"><label>জমার পরিমাণ (৳)</label><input type="number" step="any" required value={form.amount ?? ''} onChange={(e) => set('amount', e.target.value)} /></div>
@@ -76,8 +76,8 @@ export function DepositForm({ record, onClose }) {
 }
 
 export function ExpenseForm({ record, onClose }) {
-  const { state, saveKey, showToast } = useAppState();
-  const r = record || { date: todayISO(), voucher: nextVoucherNumber(state), category: '', qty: '', unit: '', rate: '', total: '', approvedBy: '', notes: '', paymentType: 'cash', supplierId: '', paidNow: '' };
+  const { state, scopedState, currentProjectId, saveKey, showToast } = useAppState();
+  const r = record || { date: todayISO(), voucher: nextVoucherNumber(scopedState), category: '', qty: '', unit: '', rate: '', total: '', approvedBy: '', notes: '', paymentType: 'cash', supplierId: '', paidNow: '' };
   const [form, setForm] = useState({ ...r, paymentType: r.paymentType || (r.supplierId ? 'credit' : 'cash') });
   const isCredit = form.paymentType === 'credit';
 
@@ -100,7 +100,7 @@ export function ExpenseForm({ record, onClose }) {
     const data = { ...form, qty: form.qty === '' ? '' : Number(form.qty), rate: form.rate === '' ? '' : Number(form.rate), total: Number(form.total) || 0 };
     if (!isCredit) { data.supplierId = ''; data.paidNow = ''; }
     else { data.paidNow = Number(data.paidNow) || 0; }
-    await saveEntity(saveKey, state, 'expenses', record?.id, data);
+    await saveEntity(saveKey, state, 'expenses', record?.id, data, currentProjectId);
     showToast('সংরক্ষণ হয়েছে');
     onClose();
   }
@@ -139,11 +139,11 @@ export function ExpenseForm({ record, onClose }) {
             <label>সাপ্লায়ার</label>
             <select value={form.supplierId || ''} onChange={(e) => set('supplierId', e.target.value)}>
               <option value="">— নির্বাচন করুন —</option>
-              {state.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {scopedState.suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div className="field"><label>এখনই কত পরিশোধ করলেন (৳)</label><input type="number" step="any" value={form.paidNow ?? 0} onChange={(e) => set('paidNow', e.target.value)} /></div>
-          {state.suppliers.length === 0 && <div className="li-sub" style={{ margin: '-4px 0 10px' }}>এখনো কোনো সাপ্লায়ার যোগ করা হয়নি — "পাওনাদার" ট্যাবে গিয়ে আগে একজন যোগ করুন।</div>}
+          {scopedState.suppliers.length === 0 && <div className="li-sub" style={{ margin: '-4px 0 10px' }}>এখনো কোনো সাপ্লায়ার যোগ করা হয়নি — "পাওনাদার" ট্যাবে গিয়ে আগে একজন যোগ করুন।</div>}
         </div>
       )}
       <div className="field"><label>অনুমোদনকারী</label><input type="text" value={form.approvedBy || ''} onChange={(e) => set('approvedBy', e.target.value)} /></div>
@@ -153,12 +153,12 @@ export function ExpenseForm({ record, onClose }) {
 }
 
 export function SupplierForm({ record, onClose }) {
-  const { state, saveKey, showToast } = useAppState();
+  const { state, currentProjectId, saveKey, showToast } = useAppState();
   const [form, setForm] = useState(record || { name: '', phone: '', notes: '' });
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
   async function onSubmit(ev) {
     ev.preventDefault();
-    await saveEntity(saveKey, state, 'suppliers', record?.id, form);
+    await saveEntity(saveKey, state, 'suppliers', record?.id, form, currentProjectId);
     showToast('সংরক্ষণ হয়েছে');
     onClose();
   }
@@ -172,12 +172,12 @@ export function SupplierForm({ record, onClose }) {
 }
 
 export function LoanForm({ record, onClose }) {
-  const { state, saveKey, showToast } = useAppState();
+  const { state, currentProjectId, saveKey, showToast } = useAppState();
   const [form, setForm] = useState(record || { type: 'payable', person: '', phone: '', principal: '', date: todayISO(), notes: '' });
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
   async function onSubmit(ev) {
     ev.preventDefault();
-    await saveEntity(saveKey, state, 'loans', record?.id, { ...form, principal: Number(form.principal) || 0 });
+    await saveEntity(saveKey, state, 'loans', record?.id, { ...form, principal: Number(form.principal) || 0 }, currentProjectId);
     showToast('সংরক্ষণ হয়েছে');
     onClose();
   }
@@ -202,12 +202,12 @@ export function LoanForm({ record, onClose }) {
 }
 
 export function ShareholderForm({ record, onClose }) {
-  const { state, saveKey, showToast } = useAppState();
+  const { state, currentProjectId, saveKey, showToast } = useAppState();
   const [form, setForm] = useState(record || { name: '', phone: '', shares: '' });
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
   async function onSubmit(ev) {
     ev.preventDefault();
-    await saveEntity(saveKey, state, 'shareholders', record?.id, { ...form, shares: Number(form.shares) || 0 });
+    await saveEntity(saveKey, state, 'shareholders', record?.id, { ...form, shares: Number(form.shares) || 0 }, currentProjectId);
     showToast('সংরক্ষণ হয়েছে');
     onClose();
   }
@@ -221,7 +221,7 @@ export function ShareholderForm({ record, onClose }) {
 }
 
 export function PaymentForm({ kind, entityId, onClose }) {
-  const { state, saveKey, showToast } = useAppState();
+  const { state, currentProjectId, saveKey, showToast } = useAppState();
   const [form, setForm] = useState({ date: todayISO(), amount: '', notes: '' });
   function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -237,7 +237,7 @@ export function PaymentForm({ kind, entityId, onClose }) {
   async function onSubmit(ev) {
     ev.preventDefault();
     const list = state[type].slice();
-    list.push({ id: uid(), date: form.date, amount: Number(form.amount) || 0, notes: form.notes, [linkKey]: entityId });
+    list.push({ id: uid(), projectId: currentProjectId, date: form.date, amount: Number(form.amount) || 0, notes: form.notes, [linkKey]: entityId });
     await saveKey(type, list);
     showToast('পেমেন্ট সংরক্ষণ হয়েছে');
     onClose();

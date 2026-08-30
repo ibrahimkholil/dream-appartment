@@ -6,8 +6,8 @@ import { LoanForm, PaymentForm } from '../Forms.jsx';
 import { LoanLedgerModal } from '../LedgerModal.jsx';
 
 export default function Loans() {
-  const { state, saveKey, showToast, openModal, closeModal } = useAppState();
-  const rows = [...state.loans].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const { state, scopedState, saveKey, showToast, openModal, closeModal } = useAppState();
+  const rows = [...scopedState.loans].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   function openEdit(l) { openModal(<LoanForm record={l} onClose={closeModal} />); }
   function openPay(id) { openModal(<PaymentForm kind="loan" entityId={id} onClose={closeModal} />); }
@@ -19,11 +19,11 @@ export default function Loans() {
 
   return (
     <>
-      <div className="section-title">পার্সোনাল লোন হিসাব <span className="tag">{state.loans.length} টি</span></div>
+      <div className="section-title">পার্সোনাল লোন হিসাব <span className="tag">{scopedState.loans.length} টি</span></div>
       <div className="card">
         {rows.length ? rows.map((l) => {
-          const repaid = loanRepaid(state, l.id);
-          const bal = loanBalance(state, l);
+          const repaid = loanRepaid(scopedState, l.id);
+          const bal = loanBalance(scopedState, l);
           return (
             <div className="list-item" key={l.id}>
               <div className="li-main">

@@ -6,8 +6,8 @@ import { ShareholderForm } from '../Forms.jsx';
 import { ShareholderLedgerModal } from '../LedgerModal.jsx';
 
 export default function Shareholders() {
-  const { state, saveKey, showToast, openModal, closeModal } = useAppState();
-  const rows = [...state.shareholders].sort((a, b) => a.name.localeCompare(b.name));
+  const { state, scopedState, saveKey, showToast, openModal, closeModal } = useAppState();
+  const rows = [...scopedState.shareholders].sort((a, b) => a.name.localeCompare(b.name));
 
   function openEdit(p) { openModal(<ShareholderForm record={p} onClose={closeModal} />); }
   function openLedger(id) { openModal(<ShareholderLedgerModal shId={id} onClose={closeModal} />); }
@@ -18,11 +18,11 @@ export default function Shareholders() {
 
   return (
     <>
-      <div className="section-title">শেয়ারহোল্ডার তালিকা <span className="tag">{state.shareholders.length} জন</span></div>
+      <div className="section-title">শেয়ারহোল্ডার তালিকা <span className="tag">{scopedState.shareholders.length} জন</span></div>
       <div className="card">
         {rows.length ? rows.map((p) => {
-          const paid = shareholderPaid(state, p.name);
-          const due = perShareCost(state) * Number(p.shares || 0) - paid;
+          const paid = shareholderPaid(scopedState, p.name);
+          const due = perShareCost(scopedState) * Number(p.shares || 0) - paid;
           return (
             <div className="list-item" key={p.id}>
               <div className="li-main">

@@ -19,27 +19,31 @@ const SYNC_LABELS = {
   error: '🔴 সংরক্ষণ ব্যর্থ, আবার চেষ্টা করুন',
 };
 
-export function Header({ onOpenAdmin, onOpenReport, onOpenAccount }) {
-  const { state, isAdmin, syncState } = useAppState();
-  const exp = totalExpense(state);
-  const rec = totalReceived(state);
+export function Header({ onOpenAdmin, onOpenReport, onOpenAccount, onOpenProjects }) {
+  const { scopedState, state, isAdmin, syncState, currentProjectId } = useAppState();
+  const exp = totalExpense(scopedState);
+  const rec = totalReceived(scopedState);
   const target = Math.max(exp, rec, 1);
   const pct = Math.min(100, Math.round((rec / target) * 100));
   const segCount = 24;
   const filled = Math.round((pct / 100) * segCount);
   const offline = typeof navigator !== 'undefined' && !navigator.onLine;
   const badgeText = offline ? SYNC_LABELS.offline : SYNC_LABELS[syncState];
+  const currentProject = state.projects.find((p) => p.id === currentProjectId);
 
   return (
     <header className="top">
       <div className="brand">
         <div>
           <div className="brand-title">ড্রিম অ্যাপার্টমেন্ট</div>
-          <div className="brand-sub">{state.shareholders.length} জন শেয়ারহোল্ডার · ফান্ড ট্র্যাকার</div>
+          <div className="brand-sub" onClick={onOpenProjects} style={{ cursor: 'pointer' }}>
+            🗂️ {currentProject ? currentProject.name : 'প্রজেক্ট নির্বাচন করুন'} · {scopedState.shareholders.length} জন শেয়ারহোল্ডার
+          </div>
           <div className={'sync-badge' + (badgeText ? ' show' : '')}>{badgeText}</div>
         </div>
         <div className="header-actions">
           {isAdmin && <button className="report-btn" title="অ্যাডমিন প্যানেল" onClick={onOpenAdmin}>🛡️</button>}
+          <button className="report-btn" title="প্রজেক্ট পরিচালনা" onClick={onOpenProjects}>🗂️</button>
           <button className="report-btn" title="রিপোর্ট / প্রিন্ট / PDF" onClick={onOpenReport}>📄</button>
           <button className="report-btn" title="অ্যাকাউন্ট ও ব্যাকআপ" onClick={onOpenAccount}>👤</button>
           <div className="brick-badge" />
@@ -76,6 +80,17 @@ export function BottomNav() {
 export function Fab({ onClick, hidden }) {
   if (hidden) return null;
   return <button className="fab" onClick={onClick}>＋</button>;
+}
+
+export function NoProjectNotice({ onCreate }) {
+  return (
+    <div className="card" style={{ textAlign: 'center', padding: '44px 20px' }}>
+      <div style={{ fontSize: 40, marginBottom: 10 }}>🗂️</div>
+      <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--navy)' }}>এখনো কোনো প্রজেক্ট নেই</div>
+      <div className="li-sub" style={{ marginBottom: 16 }}>শুরু করতে আপনার প্রথম প্রজেক্ট (যেমন: একটি অ্যাপার্টমেন্ট বিল্ডিং) তৈরি করুন।</div>
+      <button type="button" className="btn primary" style={{ flex: 'none', padding: '10px 22px' }} onClick={onCreate}>+ প্রজেক্ট তৈরি করুন</button>
+    </div>
+  );
 }
 
 export function ModalHost() {

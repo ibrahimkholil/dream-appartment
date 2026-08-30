@@ -8,7 +8,7 @@ import { paymentVoucherHtml, shareholderLedgerReportHtml, shareholderLedgerSumma
 import { printVoucher, sharePdfReport } from '../lib/pdf.js';
 
 export function SupplierLedgerModal({ supId, onClose }) {
-  const { state } = useAppState();
+  const { scopedState: state } = useAppState();
   const sup = state.suppliers.find((s) => s.id === supId);
   const invoiced = supplierInvoiced(state, supId);
   const paidAtPurchase = supplierPaidAtPurchase(state, supId);
@@ -32,7 +32,7 @@ export function SupplierLedgerModal({ supId, onClose }) {
 }
 
 export function LoanLedgerModal({ loanId, onClose }) {
-  const { state } = useAppState();
+  const { scopedState: state } = useAppState();
   const loan = state.loans.find((l) => l.id === loanId);
   const payments = state.loanPayments.filter((p) => p.loanId === loanId).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   return (
@@ -54,7 +54,7 @@ export function LoanLedgerModal({ loanId, onClose }) {
 }
 
 export function ShareholderLedgerModal({ shId, onClose }) {
-  const { state, showToast } = useAppState();
+  const { scopedState: state, showToast } = useAppState();
   const p = state.shareholders.find((x) => x.id === shId);
   if (!p) return <div className="empty">তথ্য পাওয়া যায়নি</div>;
   const deps = state.deposits.filter((d) => d.name === p.name).sort((a, b) => (a.date || '').localeCompare(b.date || ''));

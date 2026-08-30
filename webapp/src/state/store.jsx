@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   signOut, sendEmailVerification, sendPasswordResetEmail, reload,
@@ -9,7 +9,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { initFirebase, isFirebaseConfigured } from '../firebase.js';
-import { APP_KEYS, emptyState, seedCategories } from './calculations.js';
+import { APP_KEYS, PROJECT_SCOPED_KEYS, emptyState, seedCategories, scopeToProject, uid } from './calculations.js';
 
 // Permanent owner emails - mirrors firestore.rules' isOwner(). These always
 // count as admin, without needing an admins/{email} Firestore document, so
@@ -29,6 +29,7 @@ export function AppStateProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [state, setState] = useState(emptyState());
+  const [currentProjectId, setCurrentProjectId] = useState(null);
   const [tab, setTab] = useState('dashboard');
   const [syncState, setSyncStateRaw] = useState('idle');
   const [toast, setToast] = useState('');
@@ -65,9 +66,9 @@ export function AppStateProvider({ children }) {
   }
 
   // Returns the freshly-computed state (not just a flag) so callers that need
-  // to persist a just-seeded default (e.g. a brand-new user's categories)
-  // write that exact value instead of racing React's async setState via a
-  // stale stateRef.
+  // to persist a just-seeded default (e.g. a brand-new user's categories, or
+  // a one-time legacy-data migration) write that exact value instead of
+  // racing React's async setState via a stale stateRef.
   const applyState = useCallback((data) => {
     const isNew = !data;
     const next = {};
@@ -76,8 +77,24 @@ export function AppStateProvider({ children }) {
       else if (k === 'categories') next[k] = seedCategories();
       else next[k] = [];
     });
+    // One-time migration: accounts that started using the app before the
+    // "projects" concept existed have shareholders/deposits/etc with no
+    // project attached. Fold all of it into a single auto-created project
+    // instead of making it disappear once projects become mandatory.
+    let migrated = false;
+    if (!isNew && next.projects.length === 0) {
+      const hasLegacyData = PROJECT_SCOPED_KEYS.some((k) => next[k].length > 0);
+      if (hasLegacyData) {
+        const legacyProject = { id: uid(), name: 'আমার প্রথম প্রজেক্ট', address: '', createdAt: Date.now() };
+        next.projects = [legacyProject];
+        PROJECT_SCOPED_KEYS.forEach((k) => {
+          next[k] = next[k].map((r) => (r.projectId ? r : { ...r, projectId: legacyProject.id }));
+        });
+        migrated = true;
+      }
+    }
     setState(next);
-    return { isNew, next };
+    return { isNew, next, migrated };
   }, []);
 
   // Full-document overwrite - only safe for cases with no concurrent writer:
@@ -137,8 +154,13 @@ export function AppStateProvider({ children }) {
     unsubscribeRef.current = onSnapshot(stateDocRef(user), (snap) => {
       if (snap.metadata.hasPendingWrites) return;
       applyingRemoteRef.current = true;
-      applyState(snap.exists() ? snap.data().data : null);
+      const { migrated, next } = applyState(snap.exists() ? snap.data().data : null);
       applyingRemoteRef.current = false;
+      // Mirrors checkAccessAndLoad's own migrated-write: whichever call (the
+      // initial getDoc or this listener) sees the legacy data first is the
+      // one that persists it, so the one-time migration stays a single,
+      // deterministic project id no matter which fires first.
+      if (migrated) persistNow(next);
     }, (err) => console.warn('Realtime listener error', err));
   }
 
@@ -151,9 +173,9 @@ export function AppStateProvider({ children }) {
   const checkAccessAndLoad = useCallback(async (user, attempt = 0) => {
     try {
       const snap = await getDoc(stateDocRef(user));
-      const { isNew, next } = applyState(snap.exists() ? snap.data().data : null);
+      const { isNew, next, migrated } = applyState(snap.exists() ? snap.data().data : null);
       attachRealtimeListener(user);
-      if (isNew) await persistNow(next);
+      if (isNew || migrated) await persistNow(next);
       return 'ok';
     } catch (e) {
       console.warn('Access check failed', e);
@@ -342,12 +364,47 @@ export function AppStateProvider({ children }) {
     await deleteDoc(doc(dbRef.current, 'admins', email.toLowerCase()));
   }, []);
 
+  // ---------------- Project actions ----------------
+  // Keep the active project selection valid: default to the first project
+  // once any exist, and fall back if the currently-selected one got deleted.
+  useEffect(() => {
+    if (state.projects.length === 0) { if (currentProjectId !== null) setCurrentProjectId(null); return; }
+    if (!state.projects.some((p) => p.id === currentProjectId)) setCurrentProjectId(state.projects[0].id);
+  }, [state.projects, currentProjectId]);
+
+  // Everything the UI reads for display/calculations should come from here,
+  // not from `state` directly - it's the same data limited to the active
+  // project. `state` itself stays the full, unfiltered document so writes
+  // (create/edit/delete) never accidentally drop another project's records.
+  const scopedState = useMemo(() => scopeToProject(state, currentProjectId), [state, currentProjectId]);
+
+  const createProject = useCallback(async (name, address) => {
+    const project = { id: uid(), name, address: address || '', createdAt: Date.now() };
+    await saveKey('projects', [...state.projects, project]);
+    setCurrentProjectId(project.id);
+    return project;
+  }, [state.projects, saveKey]);
+
+  const updateProject = useCallback(async (id, patch) => {
+    await saveKey('projects', state.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, [state.projects, saveKey]);
+
+  // Returns 'has-data' instead of deleting when the project still owns any
+  // records, so a project can never be removed out from under its own data.
+  const deleteProject = useCallback(async (id) => {
+    const hasData = PROJECT_SCOPED_KEYS.some((k) => state[k].some((r) => r.projectId === id));
+    if (hasData) return 'has-data';
+    await saveKey('projects', state.projects.filter((p) => p.id !== id));
+    return 'ok';
+  }, [state, saveKey]);
+
   const value = {
     screen, setScreen,
     authMsg, setAuthMsg, authMode, setAuthMode, submitAuth, forgotPassword,
     resendVerification, recheckVerification, recheckPending, logout, changePassword,
     currentUser, isAdmin,
-    state, setState, saveKey, persistNow,
+    state, scopedState, setState, saveKey, persistNow,
+    currentProjectId, setCurrentProjectId, createProject, updateProject, deleteProject,
     tab, setTab,
     syncState,
     toast, showToast,

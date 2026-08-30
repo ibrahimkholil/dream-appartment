@@ -109,12 +109,25 @@ export function voucherNo(prefix, id) {
 }
 
 export const APP_KEYS = [
-  'shareholders', 'deposits', 'expenses', 'categories',
+  'projects', 'shareholders', 'deposits', 'expenses', 'categories',
   'suppliers', 'supplierPayments', 'loans', 'loanPayments',
 ];
 
 export function emptyState() {
-  return { shareholders: [], deposits: [], expenses: [], categories: [], suppliers: [], supplierPayments: [], loans: [], loanPayments: [] };
+  return { projects: [], shareholders: [], deposits: [], expenses: [], categories: [], suppliers: [], supplierPayments: [], loans: [], loanPayments: [] };
+}
+
+// The entity types that belong to one specific project. supplierPayments and
+// loanPayments are left out on purpose - they only ever get looked up via a
+// specific supplierId/loanId that is already project-scoped, so filtering
+// them separately would be redundant.
+export const PROJECT_SCOPED_KEYS = ['shareholders', 'deposits', 'expenses', 'suppliers', 'loans'];
+
+export function scopeToProject(state, projectId) {
+  const inProject = (r) => r.projectId === projectId;
+  const scoped = { ...state };
+  PROJECT_SCOPED_KEYS.forEach((k) => { scoped[k] = state[k].filter(inProject); });
+  return scoped;
 }
 
 export function seedCategories() {
