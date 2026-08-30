@@ -15,7 +15,7 @@ import { APP_KEYS, emptyState, seedCategories } from './calculations.js';
 // count as admin, without needing an admins/{email} Firestore document, so
 // the very first admin only ever requires one rules deploy, not a manually
 // created document too. Keep this list in sync with firestore.rules.
-const OWNER_EMAILS = ['ibrahimkhalil123@gmail.com', 'dreamapt@gmail.com'];
+const OWNER_EMAILS = ['ibrahimkhalil122@gmail.com', 'dreamapt@gmail.com'];
 
 const AppStateContext = createContext(null);
 export function useAppState() {

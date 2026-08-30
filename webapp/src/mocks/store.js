@@ -23,7 +23,7 @@ export function denyErr() {
 
 // Mirrors firestore.rules' isOwner() list, so tests can exercise the
 // hardcoded-owner bootstrap path the same way production rules do.
-export const OWNER_EMAILS = ['ibrahimkhalil123@gmail.com', 'dreamapt@gmail.com'];
+export const OWNER_EMAILS = ['ibrahimkhalil122@gmail.com', 'dreamapt@gmail.com'];
 
 export function isAdminMock() {
   if (!mockFirebase.user) return false;
